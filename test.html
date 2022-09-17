@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> Test for ZgaPdfSigner </title>
+<script src="https://unpkg.com/node-forge/dist/forge.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js" type="text/javascript"></script>
+<script src="zgapdfsigner.js" type="text/javascript"></script>
+<script type="text/javascript">
+function test(){
+	var img = document.getElementById("img").files[0];
+	if(img){
+		readAsArrayBuffer(img, function(a_buff){
+			testSign(a_buff, getFilExt(img));
+		});
+	}else{
+		testSign();
+	}
+}
+function getFilExt(f){
+	var n = f.name;
+	var i = n.lastIndexOf(".");
+	if(i >= 0){
+		return n.slice(i + 1);
+	}else{
+		return null;
+	}
+}
+function readAsArrayBuffer(f, func){
+	var reader = new FileReader();
+	reader.onload = function(a_evt){
+		func(a_evt.target.result);
+	};
+	reader.readAsArrayBuffer(f);
+}
+function testSign(imgdat, imgtyp){
+	var fil = document.getElementById("fff").files[0];
+	var kf = document.getElementById("kkk").files[0];
+	readAsArrayBuffer(fil, function(a_pdf){
+		readAsArrayBuffer(kf, async function(b_kfbuf){
+			var b_kfdat = String.fromCharCode.apply(null, new Uint8Array(b_kfbuf));
+			var b_opt = {
+				p12cert: b_kfdat,
+				pwd: document.getElementById("pwd").value,
+			};
+			if(imgdat){
+				b_opt.drawinf = {
+					area: {
+						x: 25, // left
+						y: 150, // top
+						w: 60,
+						h: 60,
+					},
+					imgData: imgdat,
+					imgType: imgtyp,
+				};
+			}
+			var b_signer = new PdfSigner(b_opt);
+			var b_blob = await b_signer.sign(a_pdf);
+			document.getElementById("download").download = "zzzs3.pdf";
+			document.getElementById("download").href = window.URL.createObjectURL(b_blob);
+			document.getElementById("download").click();
+		});
+	});
+}
+</script>
+</head>
+<body>
+<label>pdf </label><input type="file" id="fff" /><br />
+<label>certificate </label><input type="file" id="kkk" /><br />
+<label>passphrase </label><input type="password" id="pwd" /><br />
+<label>signature image </label><input type="file" id="img" /><br />
+<a id="download" href="#" download="" style="display: none;" target="_blank">dummy</a>
+<input type="button" value="test" onclick="test()" />
+</body>
+</html>
