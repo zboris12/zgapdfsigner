@@ -15,7 +15,7 @@ Just import the dependencies and this tool.
 ```html
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js" type="text/javascript"></script>
 <script src="https://unpkg.com/node-forge/dist/forge.min.js" type="text/javascript"></script>
-<script src="zgapdfsigner.js" type="text/javascript"></script>
+<script src="https://github.com/zboris12/zgapdfsigner/releases/download/1.0.0/zgapdfsigner.js" type="text/javascript"></script>
 ```
 
 ## Let's sign
@@ -27,16 +27,16 @@ Sign with an invisible signature.
  * @param {ArrayBuffer} pdf
  * @param {ArrayBuffer} cert
  * @param {string} pwd
- * @return {Blob}
+ * @return {Promise<Blob>}
  */
 async function sign1(pdf, cert, pwd){
-	/** @type {SignOption} */
-	var sopt = {
-		p12cert: cert,
-		pwd: pwd,
-	};
-	var signer = new PdfSigner(sopt);
-	return await signer.sign(pdf);
+  /** @type {SignOption} */
+  var sopt = {
+    p12cert: cert,
+    pwd: pwd,
+  };
+  var signer = new PdfSigner(sopt);
+  return await signer.sign(pdf);
 }
 ```
 
@@ -49,26 +49,26 @@ Sign with a visible signature of a picture.
  * @param {string} pwd
  * @param {ArrayBuffer} imgdat
  * @param {string} imgtyp
- * @return {Blob}
+ * @return {Promise<Blob>}
  */
 async function sign2(pdf, cert, pwd, imgdat, imgtyp){
-	/** @type {SignOption} */
-	var sopt = {
-		p12cert: cert,
-		pwd: pwd,
-		drawinf: {
-			area: {
-				x: 25,  // left
-				y: 150, // top
-				w: 60,  // width
-				h: 60,  // height
-			},
-			imgData: imgdat,
-			imgType: imgtyp,
-		},
-	};
-	var signer = new PdfSigner(sopt);
-	return await signer.sign(pdf);
+  /** @type {SignOption} */
+  var sopt = {
+    p12cert: cert,
+    pwd: pwd,
+    drawinf: {
+      area: {
+        x: 25,  // left
+        y: 150, // top
+        w: 60,  // width
+        h: 60,  // height
+      },
+      imgData: imgdat,
+      imgType: imgtyp,
+    },
+  };
+  var signer = new PdfSigner(sopt);
+  return await signer.sign(pdf);
 }
 ```
 
