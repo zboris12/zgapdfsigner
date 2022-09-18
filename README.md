@@ -37,7 +37,8 @@ async function sign1(pdf, cert, pwd){
     pwd: pwd,
   };
   var signer = new Zga.PdfSigner(sopt);
-  return await signer.sign(pdf);
+  var u8arr = await signer.sign(pdf);
+  return new Blob([u8arr], {"type" : "application/pdf"});
 }
 ```
 
@@ -69,7 +70,8 @@ async function sign2(pdf, cert, pwd, imgdat, imgtyp){
     },
   };
   var signer = new Zga.PdfSigner(sopt);
-  return await signer.sign(pdf);
+  var u8arr = await signer.sign(pdf);
+  return new Blob([u8arr], {"type" : "application/pdf"});
 }
 ```
 
