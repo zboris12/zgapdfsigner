@@ -39,9 +39,8 @@ function testSign(imgdat, imgtyp){
 	var kf = document.getElementById("kkk").files[0];
 	readAsArrayBuffer(fil, function(a_pdf){
 		readAsArrayBuffer(kf, async function(b_kfbuf){
-			var b_kfdat = String.fromCharCode.apply(null, new Uint8Array(b_kfbuf));
 			var b_opt = {
-				p12cert: b_kfdat,
+				p12cert: b_kfbuf,
 				pwd: document.getElementById("pwd").value,
 			};
 			if(imgdat){
@@ -56,10 +55,10 @@ function testSign(imgdat, imgtyp){
 					imgType: imgtyp,
 				};
 			}
-			var b_signer = new PdfSigner(b_opt);
-			var b_blob = await b_signer.sign(a_pdf);
+			var b_signer = new Zga.PdfSigner(b_opt);
+			var b_u8s = await b_signer.sign(a_pdf);
 			document.getElementById("download").download = "zzzs3.pdf";
-			document.getElementById("download").href = window.URL.createObjectURL(b_blob);
+			document.getElementById("download").href = window.URL.createObjectURL(new Blob([b_u8s], {"type" : "application/pdf"}));
 			document.getElementById("download").click();
 		});
 	});

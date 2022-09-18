@@ -1,44 +1,8 @@
-/**
- * the base point of x, y is top left corner.
- * @typedef
- * {{
- *    x: number,
- *    y: number,
- *    w: number,
- *    h: number,
- * }}
- */
-var SignAreaInfo;
-/**
- * @typedef
- * {{
- *    area: SignAreaInfo,
- *    pageidx: (number|undefined),
- *    imgData: (Uint8Array|ArrayBuffer|string|undefined),
- *    imgType: (string|undefined),
- *    text: (string|undefined),
- *    fontData: (PDFLib.StandardFonts|Uint8Array|ArrayBuffer|string|undefined),
- *    img: (PDFLib.PDFImage|undefined),
- *    font: (PDFLib.PDFFont|undefined),
- * }}
- */
-var SignDrawInfo;
-/**
- * @typedef
- * {{
- *    p12cert: string,
- *    pwd: string,
- *    reason: (string|undefined),
- *    location: (string|undefined),
- *    contact: (string|undefined),
- *    signdate: (Date|undefined),
- *    signame: (string|undefined),
- *    drawinf: (SignDrawInfo|undefined),
- * }}
- */
-var SignOption;
+'use strict';
 
-class PdfSigner {
+globalThis.Zga = {
+
+PdfSigner: class {
 	/**
 	 * @constructor
 	 * @param {SignOption} signopt
@@ -51,7 +15,7 @@ class PdfSigner {
 	/**
 	 * @public
 	 * @param {PDFLib.PDFDocument|Uint8Array|ArrayBuffer|string} pdf
-	 * @return {Blob}
+	 * @return {Promise<Uint8Array>}
 	 */
 	async sign(pdf){
 		/** @type {PDFLib.PDFDocument} */
@@ -74,8 +38,7 @@ class PdfSigner {
 
 		this.addSignHolder(pdfdoc);
 		var uarr = await pdfdoc.save({"useObjectStreams": false});
-		// return new Blob([uarr], {"type" : "application/pdf"});
-		var pdfstr = String.fromCharCode.apply(null, uarr);
+		var pdfstr = Zga.u8arrToRaw(uarr);
 
 		return this.signPdf(pdfstr);
 	}
@@ -91,7 +54,7 @@ class PdfSigner {
 		const SIGNATURE_LENGTH = 3322;
 
 		/** @const {VisualSignature} */
-		const visign = new VisualSignature(this.opt.drawinf);
+		const visign = new Zga.VisualSignature(this.opt.drawinf);
 		/** @const {PDFLib.PDFRef} */
 		const strmRef = visign.createStream(pdfdoc, this.opt.signame);
 		/** @const {PDFLib.PDFPage} */
@@ -118,7 +81,7 @@ class PdfSigner {
 			"M": PDFLib.PDFString.fromDate(this.opt.signdate),
 			"Prop_Build": pdfdoc.context.obj({
 				"App": pdfdoc.context.obj({
-					"Name": "ZbPdfSinger",
+					"Name": "ZgaPdfSinger",
 				}),
 			}),
 		};
@@ -167,7 +130,7 @@ class PdfSigner {
 	/**
 	 * @private
 	 * @param {string} pdfstr
-	 * @return {Blob}
+	 * @return {Uint8Array}
 	 */
 	signPdf(pdfstr){
 		if(!this.opt.signdate){
@@ -200,6 +163,9 @@ class PdfSigner {
 		// Remove the placeholder signature
 		pdfstr = pdfstr.slice(0, byteRange[1]) + pdfstr.slice(byteRange[2], byteRange[2] + byteRange[3]);
 
+		if(typeof this.opt.p12cert !== "string"){
+			this.opt.p12cert = Zga.u8arrToRaw(new Uint8Array(this.opt.p12cert));
+		}
 		// Convert Buffer P12 to a forge implementation.
 		var p12Asn1 = forge.asn1.fromDer(this.opt.p12cert);
 		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, this.opt.pwd);
@@ -271,29 +237,11 @@ class PdfSigner {
 		// Place it in the document.
 		pdfstr = pdfstr.slice(0, byteRange[1]) + "<" + sighex + ">" + pdfstr.slice(byteRange[1]);
 
-		return this.rawToBlob(pdfstr, "application/pdf");
+		return Zga.rawToU8arr(pdfstr);
 	}
+},
 
-	/**
-	 * @private
-	 * @param {string} raw
-	 * @param {string=} typ
-	 * @return {Blob}
-	 */
-	rawToBlob(raw, typ){
-		var arr = new Uint8Array(raw.length);
-		for(var i=0; i<raw.length; i++){
-			arr[i] = raw.charCodeAt(i);
-		}
-		var opt = null;
-		if(typ){
-			opt = {"type" : typ};
-		}
-		return new Blob([arr], opt);
-	}
-}
-
-class VisualSignature {
+VisualSignature: class {
 	/**
 	 * @constructor
 	 * @param {SignDrawInfo=} drawinf
@@ -504,4 +452,31 @@ class VisualSignature {
 		}
 		return ret;
 	}
-}
+},
+
+/**
+ * @param {Uint8Array} uarr
+ * @return {string}
+ */
+u8arrToRaw: function(uarr){
+	/** @type {Array<string>} */
+	var arr = [];
+	for(var i=0; i<uarr.length; i++){
+		arr.push(String.fromCharCode(uarr[i]));
+	}
+	return arr.join("");
+},
+
+/**
+ * @param {string} raw
+ * @return {Uint8Array}
+ */
+rawToU8arr: function(raw){
+	var arr = new Uint8Array(raw.length);
+	for(var i=0; i<raw.length; i++){
+		arr[i] = raw.charCodeAt(i);
+	}
+	return arr;
+},
+
+};
