@@ -86,13 +86,13 @@ PdfSigner: class {
 			}),
 		};
 		if(this.opt.reason){
-			signObj["Reason"] = PDFLib.PDFString.of(this.opt.reason);
+			signObj["Reason"] = this.convToPDFString(this.opt.reason);
 		}
 		if(this.opt.location){
-			signObj["Location"] = PDFLib.PDFString.of(this.opt.location);
+			signObj["Location"] = this.convToPDFString(this.opt.location);
 		}
 		if(this.opt.contact){
-			signObj["ContactInfo"] = PDFLib.PDFString.of(this.opt.contact);
+			signObj["ContactInfo"] = this.convToPDFString(this.opt.contact);
 		}
 		var signatureDictRef = pdfdoc.context.register(pdfdoc.context.obj(signObj));
 
@@ -103,7 +103,7 @@ PdfSigner: class {
 			"FT": "Sig",
 			"Rect": visign.getSignRect(),
 			"V": signatureDictRef,
-			"T": PDFLib.PDFString.of(this.opt.signame ? this.opt.signame : "Signature1"),
+			"T": this.convToPDFString(this.opt.signame ? this.opt.signame : "Signature1"),
 			"F": 132,
 			"P": page.ref,
 		};
@@ -238,6 +238,27 @@ PdfSigner: class {
 		pdfstr = pdfstr.slice(0, byteRange[1]) + "<" + sighex + ">" + pdfstr.slice(byteRange[1]);
 
 		return Zga.rawToU8arr(pdfstr);
+	}
+
+	/**
+	 * @private
+	 * @param {string} str
+	 * @return {PDFLib.PDFString|PDFLib.PDFHexString}
+	 */
+	convToPDFString(str){
+		// Check if there is a multi-bytes char in the string.
+		var flg = false;
+		for(var i=0; i<str.length; i++){
+			if(str.charCodeAt(i) > 0xFF){
+				flg = true;
+				break;
+			}
+		}
+		if(flg){
+			return PDFLib.PDFHexString.fromText(str);
+		}else{
+			return PDFLib.PDFString.of(str);
+		}
 	}
 },
 
