@@ -1,4 +1,12 @@
 /**
+ * @typedef
+ * {{
+ *    url: string,
+ *    len: (number|undefined),
+ * }}
+ */
+var TsaServiceInfo;
+/**
  * the base point of x, y is top left corner.
  * @typedef
  * {{
@@ -14,10 +22,10 @@ var SignAreaInfo;
  * {{
  *    area: SignAreaInfo,
  *    pageidx: (number|undefined),
- *    imgData: (Uint8Array|ArrayBuffer|string|undefined),
+ *    imgData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
  *    imgType: (string|undefined),
  *    text: (string|undefined),
- *    fontData: (PDFLib.StandardFonts|Uint8Array|ArrayBuffer|string|undefined),
+ *    fontData: (PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string|undefined),
  *    img: (PDFLib.PDFImage|undefined),
  *    font: (PDFLib.PDFFont|undefined),
  * }}
@@ -26,14 +34,15 @@ var SignDrawInfo;
 /**
  * @typedef
  * {{
- *    p12cert: (Uint8Array|ArrayBuffer|string),
+ *    p12cert: (Array<number>|Uint8Array|ArrayBuffer|string),
  *    pwd: string,
  *    reason: (string|undefined),
  *    location: (string|undefined),
  *    contact: (string|undefined),
- *    signdate: (Date|undefined),
+ *    signdate: (Date|TsaServiceInfo|string|undefined),
  *    signame: (string|undefined),
  *    drawinf: (SignDrawInfo|undefined),
+ *    debug: (boolean|undefined),
  * }}
  */
 var SignOption;

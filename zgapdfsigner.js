@@ -2,6 +2,17 @@
 
 globalThis.Zga = {
 
+/** @type {Object<string, TsaServiceInfo>} */
+TSAURLS: {
+	"1": {url: "http://ts.ssl.com", len: 15100},
+	"2": {url: "http://timestamp.digicert.com", len: 14900},
+	"3": {url: "http://timestamp.sectigo.com", len: 12900},
+	"4": {url: "http://timestamp.entrust.net/TSS/RFC3161sha2TS", len: 13900},
+	"5": {url: "http://timestamp.apple.com/ts01", len: 11600},
+	"6": {url: "http://www.langedge.jp/tsa", len: 8700},
+	"7": {url: "https://freetsa.org/tsr", len: 14000},
+},
+
 PdfSigner: class {
 	/**
 	 * @constructor
@@ -10,11 +21,49 @@ PdfSigner: class {
 	constructor(signopt){
 		/** @private @type {SignOption} */
 		this.opt = signopt;
+		/** @private @type {TsaServiceInfo} */
+		this.tsainf = null;
+		/** @private @type {boolean} */
+		this.debug = false;
+
+		if(!globalThis.PDFLib){
+			throw new Error("pdf-lib is not imported.");
+		}
+		if(!globalThis.forge){
+			throw new Error("node-forge is not imported.");
+		}
+		if(signopt.signdate){
+			if(typeof signopt.signdate == "string"){
+				this.tsainf = {
+					url: signopt.signdate,
+				};
+			}else if(signopt.signdate.url){
+				this.tsainf = Object.assign({}, signopt.signdate);
+			}
+		}
+		if(this.tsainf){
+			if(!globalThis.UrlFetchApp){
+				throw new Error("Because of the CORS security restrictions, signing with TSA is not supported in web browser.");
+			}
+			if(Zga.TSAURLS[this.tsainf.url]){
+				Object.assign(this.tsainf, Zga.TSAURLS[this.tsainf.url]);
+			}else if(!(new RegExp("^https?://")).test(this.tsainf.url)){
+				throw new Error("Unknown tsa data. " + JSON.stringify(this.tsainf));
+			}
+			if(!this.tsainf.len){
+				this.tsainf.len = 16000;
+			}
+		}
+		if(typeof this.opt.debug == "boolean"){
+			this.debug = this.opt.debug;
+		}else if(globalThis.debug){
+			this.debug = true;
+		}
 	}
 
 	/**
 	 * @public
-	 * @param {PDFLib.PDFDocument|Uint8Array|ArrayBuffer|string} pdf
+	 * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
 	 * @return {Promise<Uint8Array>}
 	 */
 	async sign(pdf){
@@ -22,15 +71,24 @@ PdfSigner: class {
 		var pdfdoc = null;
 		if(pdf.addPage){
 			pdfdoc = pdf;
+		}else if(Array.isArray(pdf)){
+			pdfdoc = await PDFLib.PDFDocument.load(new Uint8Array(pdf));
 		}else{
 			pdfdoc = await PDFLib.PDFDocument.load(pdf);
 		}
 
 		if(this.opt.drawinf && this.opt.drawinf.imgData && !this.opt.drawinf.img){
+			/** @type {Uint8Array|ArrayBuffer|string} */
+			var imgData2 = null;
+			if(Array.isArray(this.opt.drawinf.imgData)){
+				imgData2 = new Uint8Array(this.opt.drawinf.imgData);
+			}else{
+				imgData2 = this.opt.drawinf.imgData;
+			}
 			if(this.opt.drawinf.imgType == "png"){
-				this.opt.drawinf.img = await pdfdoc.embedPng(this.opt.drawinf.imgData);
+				this.opt.drawinf.img = await pdfdoc.embedPng(imgData2);
 			}else if(this.opt.drawinf.imgType == "jpg"){
-				this.opt.drawinf.img = await pdfdoc.embedJpg(this.opt.drawinf.imgData);
+				this.opt.drawinf.img = await pdfdoc.embedJpg(imgData2);
 			}else{
 				throw new Error("Unkown image type. " + this.opt.drawinf.imgType);
 			}
@@ -40,7 +98,12 @@ PdfSigner: class {
 		var uarr = await pdfdoc.save({"useObjectStreams": false});
 		var pdfstr = Zga.u8arrToRaw(uarr);
 
-		return this.signPdf(pdfstr);
+		this.log("A signature holder has been added to the pdf.");
+
+		/** @type {Uint8Array} */
+		var ret = this.signPdf(pdfstr);
+		this.log("Signing pdf accomplished.");
+		return ret;
 	}
 
 	/**
@@ -51,7 +114,7 @@ PdfSigner: class {
 		/** @const {string} */
 		const DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
 		/** @const {number} */
-		const SIGNATURE_LENGTH = 3322;
+		const SIGNATURE_LENGTH = this.tsainf ? this.tsainf.len : 3322;
 
 		/** @const {VisualSignature} */
 		const visign = new Zga.VisualSignature(this.opt.drawinf);
@@ -60,8 +123,10 @@ PdfSigner: class {
 		/** @const {PDFLib.PDFPage} */
 		const page = pdfdoc.getPages()[visign.getPageIndex()];
 
-		if(!this.opt.signdate){
-			this.opt.signdate = new Date();
+		/** @type {Date} */
+		var signdate = new Date();
+		if(this.opt.signdate instanceof Date && !this.tsainf){
+			signdate = this.opt.signdate;
 		}
 
 		/** @type {PDFLib.PDFArray} */
@@ -78,7 +143,7 @@ PdfSigner: class {
 			"SubFilter": "adbe.pkcs7.detached",
 			"ByteRange": bytrng,
 			"Contents": PDFLib.PDFHexString.of("0".repeat(SIGNATURE_LENGTH)),
-			"M": PDFLib.PDFString.fromDate(this.opt.signdate),
+			"M": PDFLib.PDFString.fromDate(signdate),
 			"Prop_Build": pdfdoc.context.obj({
 				"App": pdfdoc.context.obj({
 					"Name": "ZgaPdfSinger",
@@ -133,8 +198,10 @@ PdfSigner: class {
 	 * @return {Uint8Array}
 	 */
 	signPdf(pdfstr){
-		if(!this.opt.signdate){
-			this.opt.signdate = new Date();
+		/** @type {Date} */
+		var signdate = new Date();
+		if(this.opt.signdate instanceof Date && !this.tsainf){
+			signdate = this.opt.signdate;
 		}
 
 		// Finds ByteRange information within a given PDF Buffer if one exists
@@ -217,19 +284,37 @@ PdfSigner: class {
 					"type": forge.pki.oids.messageDigest,
 				}, {
 					"type": forge.pki.oids.signingTime,
-					"value": this.opt.signdate,
+					"value": signdate,
 				},
 			],
 		});
 
+		if(this.tsainf){
+			//p7.signers[0].unauthenticatedAttributes.push({type: forge.pki.oids.timeStampToken, value: ""}) 
+			p7.signers[0].unauthenticatedAttributes.push({type: "1.2.840.113549.1.9.16.2.14", value: ""});
+		}
+
 		// Sign in detached mode.
 		p7.sign({"detached": true});
+
+		if(this.tsainf){
+			var tsatoken = this.queryTsa(p7.signers[0].signature);
+			p7.signerInfos[0].value[6].value[0].value[1] = forge.asn1.create(
+				forge.asn1.Class.UNIVERSAL,
+				forge.asn1.Type.SET,
+				true,
+				[tsatoken]
+			);
+			this.log("Timestamp from " + this.tsainf.url + " has been added to the signature.");
+		}
+
 		// Check if the PDF has a good enough placeholder to fit the signature.
 		var sighex = forge.asn1.toDer(p7.toAsn1()).toHex();
 		// placeholderLength represents the length of the HEXified symbols but we're
 		// checking the actual lengths.
+		this.log("Size of signature is " + sighex.length + "/" + placeholderLength);
 		if(sighex.length > placeholderLength){
-			throw new Error("Signature is too big.");
+			throw new Error("Signature is too big. Needs: " + sighex.length);
 		}else{
 			// Pad the signature with zeroes so the it is the same length as the placeholder
 			sighex += "0".repeat(placeholderLength - sighex.length);
@@ -258,6 +343,105 @@ PdfSigner: class {
 			return PDFLib.PDFHexString.fromText(str);
 		}else{
 			return PDFLib.PDFString.of(str);
+		}
+	}
+
+	/**
+	 * @private
+	 * @param {string} signature
+	 * @return {string}
+	 */
+	genTsrData(signature){
+		// Generate SHA256 hash from signature content for TSA
+		var md = forge.md.sha256.create();
+		md.update(signature);
+		// Generate TSA request
+		var asn1Req = forge.asn1.create(
+			forge.asn1.Class.UNIVERSAL,
+			forge.asn1.Type.SEQUENCE,
+			true,
+			[
+				// Version
+				{
+					composed: false,
+					constructed: false,
+					tagClass: forge.asn1.Class.UNIVERSAL,
+					type: forge.asn1.Type.INTEGER,
+					value: forge.asn1.integerToDer(1).data,
+				},
+				{
+					composed: true,
+					constructed: true,
+					tagClass: forge.asn1.Class.UNIVERSAL,
+					type: forge.asn1.Type.SEQUENCE,
+					value: [
+						{
+							composed: true,
+							constructed: true,
+							tagClass: forge.asn1.Class.UNIVERSAL,
+							type: forge.asn1.Type.SEQUENCE,
+							value: [
+								{
+									composed: false,
+									constructed: false,
+									tagClass: forge.asn1.Class.UNIVERSAL,
+									type: forge.asn1.Type.OID,
+									value: forge.asn1.oidToDer(forge.oids.sha256).data,
+								}, {
+									composed: false,
+									constructed: false,
+									tagClass: forge.asn1.Class.UNIVERSAL,
+									type: forge.asn1.Type.NULL,
+									value: ""
+								}
+							]
+						}, {// Message imprint
+							composed: false,
+							constructed: false,
+							tagClass: forge.asn1.Class.UNIVERSAL,
+							type: forge.asn1.Type.OCTETSTRING,
+							value: md.digest().data,
+						}
+					]
+				}, {
+					composed: false,
+					constructed: false,
+					tagClass: forge.asn1.Class.UNIVERSAL,
+					type: forge.asn1.Type.BOOLEAN,
+					value: 1, // Get REQ certificates
+				}
+			]
+		);
+
+		return forge.asn1.toDer(asn1Req).data;
+	}
+
+	/**
+	 * @private
+	 * @param {string} signature
+	 * @return {Object}
+	 */
+	queryTsa(signature){
+		var tsr = this.genTsrData(signature);
+		var tu8s = Zga.rawToU8arr(tsr);
+		var options = {
+			"method": "POST",
+			"headers": {"Content-Type": "application/timestamp-query"},
+			"payload": tu8s,
+		};
+		var tblob = UrlFetchApp.fetch(this.tsainf.url, options).getBlob();
+		var tstr = Zga.u8arrToRaw(new Uint8Array(tblob.getBytes()));
+		var token = forge.asn1.fromDer(tstr).value[1];
+		return token;
+	}
+
+	/**
+	 * @private
+	 * @param {string} msg
+	 */
+	log(msg){
+		if(this.debug){
+			console.log(msg);
 		}
 	}
 },
