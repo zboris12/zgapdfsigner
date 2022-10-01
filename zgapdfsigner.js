@@ -267,7 +267,16 @@ PdfSigner: class {
 				cert = a_cert;
 			}
 		});
-		if(!cert){
+		if(cert){
+			// When converting to asn1, forge will encode the value of issuer to utf8 if the valueTagClass is UTF8.
+			// But the value load from pfx is already utf8 encoded, so the encoding action will break the final signature.
+			// To avoid the broken signature issue, we decode the value before the other actions.
+			cert.issuer.attributes.forEach(function(a_ele, a_idx, a_arr){
+				if(a_ele.valueTagClass === forge.asn1.Type.UTF8){
+					a_ele.value = forge.util.decodeUtf8(a_ele.value);
+				}
+			});
+		}else{
 			throw new Error("Failed to find a certificate.");
 		}
 
@@ -567,22 +576,23 @@ VisualSignature: class {
 		case 90:
 			ret.w = visinf.h;
 			ret.h = visinf.w;
-			ret.x = visinf.y;
+			ret.x = visinf.y + visinf.h;
 			ret.y = visinf.x;
 			break;
 		case 180:
 		case -180:
 			ret.x = pgsz.width - visinf.x;
+			ret.y = visinf.y + visinf.h;
 			break;
 		case 270:
 		case -90:
 			ret.w = visinf.h;
 			ret.h = visinf.w;
-			ret.x = pgsz.width - visinf.y;
+			ret.x = pgsz.width - visinf.y - visinf.h;
 			ret.y = pgsz.height - visinf.x;
 			break;
 		default:
-			ret.y = pgsz.height - visinf.y;
+			ret.y = pgsz.height - visinf.y - visinf.h;
 		}
 		return ret;
 	}
