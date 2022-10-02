@@ -1,5 +1,5 @@
 # ZgaPdfSigner
-A javascript tool to sign a pdf in web browser.  
+A javascript tool to sign a pdf or set protection of a pdf in web browser.  
 And it also can be used in Google Apps Script.  
 
 PS: __ZGA__ is the abbreviation of my father's name.  
@@ -156,6 +156,85 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
   * __text__: string :point_right: (Optional) A text drawing on signature, __not implemented yet__
   * __fontData__: PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The font's data for drawing text, __not implemented yet__
 
+## Let's protect the pdf
+
+Set protection to the pdf.
+
+```js
+/**
+ * @param {ArrayBuffer} pdf
+ * @param {string} upwd
+ * @param {string} opwd
+ * @return {Promise<Blob>}
+ */
+async function protect1(pdf, upwd, opwd){
+  /** @type {EncryptOption} */
+  var eopt = {
+    mode: Zga.Crypto.Mode.AES_256,
+    permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
+    userpwd: upwd,
+    ownerpwd: opwd,
+  };
+  var cyptor = new Zga.PdfCryptor(eopt);
+  var pdfdoc = await cyptor.encryptPdf(pdf);
+  u8arr = await pdfdoc.save({"useObjectStreams": false});
+  return new Blob([u8arr], {"type" : "application/pdf"});
+}
+```
+
+Sign and set protection.
+
+```js
+/**
+ * @param {ArrayBuffer} pdf
+ * @param {ArrayBuffer} cert
+ * @param {string} pwd
+ * @param {string} opwd
+ * @return {Promise<Blob>}
+ */
+async function sign1(pdf, cert, pwd, opwd){
+  /** @type {SignOption} */
+  var sopt = {
+    p12cert: cert,
+    pwd: pwd,
+  };
+  /** @type {EncryptOption} */
+  var eopt = {
+    mode: Zga.Crypto.Mode.RC4_128,
+    permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
+    ownerpwd: opwd,
+  };
+  var signer = new Zga.PdfSigner(sopt);
+  var u8arr = await signer.sign(pdf, eopt);
+  return new Blob([u8arr], {"type" : "application/pdf"});
+}
+```
+
+## Detail of EncryptOption
+
+* __mode__: Zga.Crypto.Mode :point_right: The values of Zga.Crypto.Mode
+  * RC4_40: 40bit RC4 Encryption
+  * RC4_128: 128bit RC4 Encryption
+  * AES_128: 128bit AES Encryption
+  * AES_256: 256bit AES Encryption
+* __permissions__: Array<Zga.Crypto.Permission> :point_right: (Optional) The set of permissions you want to block
+  * "print": Print the document;
+  * "modify": Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble';
+  * "copy": Copy or otherwise extract text and graphics from the document;
+  * "annot-forms": Add or modify text annotations, fill in interactive form fields, and, if 'modify' is also set, create or modify interactive form fields (including signature fields);
+  * "fill-forms": Fill in existing interactive form fields (including signature fields), even if 'annot-forms' is not specified;
+  * "extract": Extract text and graphics (in support of accessibility to users with disabilities or for other purposes);
+  * "assemble": Assemble the document (insert, rotate, or delete pages and create bookmarks or thumbnail images), even if 'modify' is not set;
+  * "print-high": Print the document to a representation from which a faithful digital copy of the PDF content could be generated. When this is not set, printing is limited to a low-level representation of the appearance, possibly of degraded quality.
+  * "owner": (inverted logic - only for public-key) when set permits change of encryption and enables all other permissions.
+* __userpwd__: string :point_right: (Optional) User password. Used when opening the pdf.
+* __ownerpwd__: string :point_right: (Optional) Owner password. If not specified, a random value is used.
+* __pubkeys__: Array<_PubKeyInfo_> :point_right: (Optional) Array of recipients containing public-key certificates ('c') and permissions ('p'). <ins>Not supported yet.</ins>
+  * __c__: string :point_right: A public-key certificate
+  * __p__: Array<Zga.Crypto.Permission> :point_right: (Optional) Permissions
+
+## Thanks
+* The module of setting protection was migrated from [TCPDF](http://www.tcpdf.org).
 
 ## License
 

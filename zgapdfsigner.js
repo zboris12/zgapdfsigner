@@ -1,28 +1,37 @@
 'use strict';
 
-globalThis.Zga = {
+/**
+ * @param {Object<string, *>} z
+ */
+function supplyZgaSigner(z){
 
 /** @type {Object<string, TsaServiceInfo>} */
-TSAURLS: {
-	"1": {url: "http://ts.ssl.com", len: 15100},
-	"2": {url: "http://timestamp.digicert.com", len: 14900},
-	"3": {url: "http://timestamp.sectigo.com", len: 12900},
-	"4": {url: "http://timestamp.entrust.net/TSS/RFC3161sha2TS", len: 13900},
-	"5": {url: "http://timestamp.apple.com/ts01", len: 11600},
-	"6": {url: "http://www.langedge.jp/tsa", len: 8700},
-	"7": {url: "https://freetsa.org/tsr", len: 14000},
-},
+z.TSAURLS = {
+	"1": {url: "http://ts.ssl.com", len: 15600},
+	"2": {url: "http://timestamp.digicert.com", len: 15400},
+	"3": {url: "http://timestamp.sectigo.com", len: 13400},
+	"4": {url: "http://timestamp.entrust.net/TSS/RFC3161sha2TS", len: 14400},
+	"5": {url: "http://timestamp.apple.com/ts01", len: 12100},
+	"6": {url: "http://www.langedge.jp/tsa", len: 9200},
+	"7": {url: "https://freetsa.org/tsr", len: 14500},
+};
 
-PdfSigner: class {
+z.PdfSigner = class{
 	/**
 	 * @constructor
 	 * @param {SignOption} signopt
 	 */
 	constructor(signopt){
+		/** @private @const {string} */
+		this.DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
 		/** @private @type {SignOption} */
 		this.opt = signopt;
 		/** @private @type {TsaServiceInfo} */
 		this.tsainf = null;
+		/** @private @type {number} */
+		this.siglen = 0;
+		/** @private @type {PDFLib.PDFHexString} */
+		this.sigContents = null;
 		/** @private @type {boolean} */
 		this.debug = false;
 
@@ -45,8 +54,8 @@ PdfSigner: class {
 			if(!globalThis.UrlFetchApp){
 				throw new Error("Because of the CORS security restrictions, signing with TSA is not supported in web browser.");
 			}
-			if(Zga.TSAURLS[this.tsainf.url]){
-				Object.assign(this.tsainf, Zga.TSAURLS[this.tsainf.url]);
+			if(z.TSAURLS[this.tsainf.url]){
+				Object.assign(this.tsainf, z.TSAURLS[this.tsainf.url]);
 			}else if(!(new RegExp("^https?://")).test(this.tsainf.url)){
 				throw new Error("Unknown tsa data. " + JSON.stringify(this.tsainf));
 			}
@@ -64,18 +73,16 @@ PdfSigner: class {
 	/**
 	 * @public
 	 * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
+	 * @param {EncryptOption=} cypopt
 	 * @return {Promise<Uint8Array>}
 	 */
-	async sign(pdf){
-		/** @type {PDFLib.PDFDocument} */
-		var pdfdoc = null;
-		if(pdf.addPage){
-			pdfdoc = pdf;
-		}else if(Array.isArray(pdf)){
-			pdfdoc = await PDFLib.PDFDocument.load(new Uint8Array(pdf));
-		}else{
-			pdfdoc = await PDFLib.PDFDocument.load(pdf);
+	async sign(pdf, cypopt){
+		if(cypopt && !z.PdfCryptor){
+			throw new Error("ZgaPdfCryptor is not imported.");
 		}
+
+		/** @type {PDFLib.PDFDocument} */
+		var pdfdoc = await z.loadPdf(pdf);
 
 		if(this.opt.drawinf && this.opt.drawinf.imgData && !this.opt.drawinf.img){
 			/** @type {Uint8Array|ArrayBuffer|string} */
@@ -95,15 +102,47 @@ PdfSigner: class {
 		}
 
 		this.addSignHolder(pdfdoc);
-		var uarr = await pdfdoc.save({"useObjectStreams": false});
-		var pdfstr = Zga.u8arrToRaw(uarr);
-
 		this.log("A signature holder has been added to the pdf.");
 
+		if(cypopt){
+			/** @type {Zga.PdfCryptor} */
+			var cypt = new z.PdfCryptor(cypopt);
+			pdfdoc = await cypt.encryptPdf(pdfdoc, true);
+			// Because pdfdoc has been changed, so this.sigContents need to be found again.
+			this.sigContents = null;
+			this.log("Pdf data has been encrypted.");
+		}
+
 		/** @type {Uint8Array} */
-		var ret = this.signPdf(pdfstr);
-		this.log("Signing pdf accomplished.");
+		var ret = await this.saveAndSign(pdfdoc);
+		if(!ret){
+			this.log("Change size of signature's placeholder and retry.");
+			if(!this.sigContents){
+				this.sigContents = this.findSigContents(pdfdoc);
+			}
+			this.sigContents.value = "0".repeat(this.siglen);
+			ret = await this.saveAndSign(pdfdoc);
+		}
+		if(ret){
+			this.log("Signing pdf accomplished.");
+		}else{
+			throw new Error("Failed to sign the pdf.");
+		}
+
 		return ret;
+	}
+
+	/**
+	 * @private
+	 * @param {PDFLib.PDFDocument} pdfdoc
+	 * @return {Promise<Uint8Array>}
+	 */
+	async saveAndSign(pdfdoc){
+		/** @type {Uint8Array} */
+		var uarr = await pdfdoc.save({"useObjectStreams": false});
+		/** @type {string} */
+		var pdfstr = z.u8arrToRaw(uarr);
+		return this.signPdf(pdfstr);
 	}
 
 	/**
@@ -111,13 +150,8 @@ PdfSigner: class {
 	 * @param {PDFLib.PDFDocument} pdfdoc
 	 */
 	addSignHolder(pdfdoc){
-		/** @const {string} */
-		const DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
-		/** @const {number} */
-		const SIGNATURE_LENGTH = this.tsainf ? this.tsainf.len : 3322;
-
 		/** @const {VisualSignature} */
-		const visign = new Zga.VisualSignature(this.opt.drawinf);
+		const visign = new z.VisualSignature(this.opt.drawinf);
 		/** @const {PDFLib.PDFRef} */
 		const strmRef = visign.createStream(pdfdoc, this.opt.signame);
 		/** @const {PDFLib.PDFPage} */
@@ -132,9 +166,12 @@ PdfSigner: class {
 		/** @type {PDFLib.PDFArray} */
 		var bytrng = new PDFLib.PDFArray(pdfdoc.context);
 		bytrng.push(PDFLib.PDFNumber.of(0));
-		bytrng.push(PDFLib.PDFName.of(DEFAULT_BYTE_RANGE_PLACEHOLDER));
-		bytrng.push(PDFLib.PDFName.of(DEFAULT_BYTE_RANGE_PLACEHOLDER));
-		bytrng.push(PDFLib.PDFName.of(DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+
+		this.siglen = this.tsainf ? this.tsainf.len : 3322;
+		this.sigContents = PDFLib.PDFHexString.of("0".repeat(this.siglen));
 
 		/** @type {Object<string, *>} */
 		var signObj = {
@@ -142,7 +179,7 @@ PdfSigner: class {
 			"Filter": "Adobe.PPKLite",
 			"SubFilter": "adbe.pkcs7.detached",
 			"ByteRange": bytrng,
-			"Contents": PDFLib.PDFHexString.of("0".repeat(SIGNATURE_LENGTH)),
+			"Contents": this.sigContents,
 			"M": PDFLib.PDFString.fromDate(signdate),
 			"Prop_Build": pdfdoc.context.obj({
 				"App": pdfdoc.context.obj({
@@ -194,6 +231,51 @@ PdfSigner: class {
 
 	/**
 	 * @private
+	 * @param {PDFLib.PDFDocument} pdfdoc
+	 * @return {PDFLib.PDFHexString}
+	 */
+	findSigContents(pdfdoc){
+		/** @type {boolean} */
+		var istgt = false;
+		/** @type {PDFLib.PDFHexString} */
+		var sigContents = null;
+		/** @type {Array<*>} */
+		var objarr = pdfdoc.context.enumerateIndirectObjects();
+		for(var i=objarr.length - 1; i>= 0; i--){
+			if(objarr[i][1].dict instanceof Map){
+				/** @type {Iterator} */
+				var es = objarr[i][1].dict.entries();
+				/** @type {IteratorResult} */
+				var res = es.next();
+				istgt = false;
+				sigContents = null;
+				while(!res.done){
+					if(res.value[0].encodedName == "/ByteRange"){
+						if(res.value[1].array &&
+							res.value[1].array.length == 4 &&
+							res.value[1].array[0].numberValue == 0 &&
+							res.value[1].array[1].encodedName == "/" + this.DEFAULT_BYTE_RANGE_PLACEHOLDER &&
+							res.value[1].array[2].encodedName == res.value[1].array[1].encodedName &&
+							res.value[1].array[3].encodedName == res.value[1].array[1].encodedName){
+							istgt = true;
+						}
+					}else if(res.value[0].encodedName == "/Contents"){
+						if(res.value[1] instanceof PDFLib.PDFHexString){
+							sigContents = res.value[1];
+						}
+					}
+					if(istgt && sigContents){
+						return sigContents;
+					}else{
+						res = es.next();
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * @private
 	 * @param {string} pdfstr
 	 * @return {Uint8Array}
 	 */
@@ -207,8 +289,8 @@ PdfSigner: class {
 		// Finds ByteRange information within a given PDF Buffer if one exists
 		var byteRangeStrings = pdfstr.match(/\/ByteRange\s*\[{1}\s*(?:(?:\d*|\/\*{10})\s+){3}(?:\d+|\/\*{10}){1}\s*]{1}/g);
 		var byteRangePlaceholder = byteRangeStrings.find(function(a_str){
-			return a_str.includes("/**********");
-		});
+			return a_str.includes("/"+this.DEFAULT_BYTE_RANGE_PLACEHOLDER);
+		}.bind(this));
 		if(!byteRangePlaceholder){
 			throw new Error("no signature placeholder");
 		}
@@ -231,7 +313,7 @@ PdfSigner: class {
 		pdfstr = pdfstr.slice(0, byteRange[1]) + pdfstr.slice(byteRange[2], byteRange[2] + byteRange[3]);
 
 		if(typeof this.opt.p12cert !== "string"){
-			this.opt.p12cert = Zga.u8arrToRaw(new Uint8Array(this.opt.p12cert));
+			this.opt.p12cert = z.u8arrToRaw(new Uint8Array(this.opt.p12cert));
 		}
 		// Convert Buffer P12 to a forge implementation.
 		var p12Asn1 = forge.asn1.fromDer(this.opt.p12cert);
@@ -323,7 +405,9 @@ PdfSigner: class {
 		// checking the actual lengths.
 		this.log("Size of signature is " + sighex.length + "/" + placeholderLength);
 		if(sighex.length > placeholderLength){
-			throw new Error("Signature is too big. Needs: " + sighex.length);
+			// throw new Error("Signature is too big. Needs: " + sighex.length);
+			this.siglen = sighex.length;
+			return null;
 		}else{
 			// Pad the signature with zeroes so the it is the same length as the placeholder
 			sighex += "0".repeat(placeholderLength - sighex.length);
@@ -331,7 +415,7 @@ PdfSigner: class {
 		// Place it in the document.
 		pdfstr = pdfstr.slice(0, byteRange[1]) + "<" + sighex + ">" + pdfstr.slice(byteRange[1]);
 
-		return Zga.rawToU8arr(pdfstr);
+		return z.rawToU8arr(pdfstr);
 	}
 
 	/**
@@ -432,14 +516,14 @@ PdfSigner: class {
 	 */
 	queryTsa(signature){
 		var tsr = this.genTsrData(signature);
-		var tu8s = Zga.rawToU8arr(tsr);
+		var tu8s = z.rawToU8arr(tsr);
 		var options = {
 			"method": "POST",
 			"headers": {"Content-Type": "application/timestamp-query"},
 			"payload": tu8s,
 		};
 		var tblob = UrlFetchApp.fetch(this.tsainf.url, options).getBlob();
-		var tstr = Zga.u8arrToRaw(new Uint8Array(tblob.getBytes()));
+		var tstr = z.u8arrToRaw(new Uint8Array(tblob.getBytes()));
 		var token = forge.asn1.fromDer(tstr).value[1];
 		return token;
 	}
@@ -453,9 +537,9 @@ PdfSigner: class {
 			console.log(msg);
 		}
 	}
-},
+};
 
-VisualSignature: class {
+z.VisualSignature = class{
 	/**
 	 * @constructor
 	 * @param {SignDrawInfo=} drawinf
@@ -667,31 +751,11 @@ VisualSignature: class {
 		}
 		return ret;
 	}
-},
-
-/**
- * @param {Uint8Array} uarr
- * @return {string}
- */
-u8arrToRaw: function(uarr){
-	/** @type {Array<string>} */
-	var arr = [];
-	for(var i=0; i<uarr.length; i++){
-		arr.push(String.fromCharCode(uarr[i]));
-	}
-	return arr.join("");
-},
-
-/**
- * @param {string} raw
- * @return {Uint8Array}
- */
-rawToU8arr: function(raw){
-	var arr = new Uint8Array(raw.length);
-	for(var i=0; i<raw.length; i++){
-		arr[i] = raw.charCodeAt(i);
-	}
-	return arr;
-},
-
 };
+
+}
+
+if(!globalThis.Zga){
+	globalThis.Zga = {};
+}
+supplyZgaSigner(globalThis.Zga);
