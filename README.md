@@ -25,7 +25,7 @@ Just import the dependencies and this tool.
 ```html
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js" type="text/javascript"></script>
 <script src="https://unpkg.com/node-forge/dist/forge.min.js" type="text/javascript"></script>
-<script src="https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/zgapdfsigner.js" type="text/javascript"></script>
+<script src="https://github.com/zboris12/zgapdfsigner/releases/download/2.0.0/zgapdfsigner.min.js" type="text/javascript"></script>
 ```
 
 ## Let's sign
@@ -105,7 +105,7 @@ eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").g
 // Load node-forge
 eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/forge.min.edited.js").getContentText());
 // Load ZgaPdfSigner
-eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/zgapdfsigner.js").getContentText());
+eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/2.0.0/zgapdfsigner.min.js").getContentText());
 
 // Load pdf, certificate
 var pdfBlob = DriveApp.getFilesByName("_test.pdf").next().getBlob();
