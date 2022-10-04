@@ -51,7 +51,7 @@ var SignOption;
  * @typedef
  * {{
  *    c: string,
- *    p: (Array<Zga.Crypto.Permission>|undefined),
+ *    p: (Array<string>|undefined),
  * }}
  */
 var PubKeyInfo;
@@ -74,7 +74,7 @@ var PubKeyInfo;
  * @typedef
  * {{
  *    mode: Zga.Crypto.Mode,
- *    permissions: (Array<Zga.Crypto.Permission>|undefined),
+ *    permissions: (Array<string>|undefined),
  *    userpwd: (string|undefined),
  *    ownerpwd: (string|undefined),
  *    pubkeys: (Array<PubKeyInfo>|undefined),
@@ -101,3 +101,25 @@ var CFType;
  * }}
  */
 var RC4LastInfo;
+
+var Zga = {};
+Zga.Crypto = {};
+/** @enum {number} */
+Zga.Crypto.Mode = {
+	RC4_40: 0,
+	RC4_128: 1,
+	AES_128: 2,
+	AES_256: 3,
+};
+/**
+ * @constructor
+ * @param {EncryptOption} encopt
+ */
+Zga.PdfCryptor = function(encopt){};
+/**
+ * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
+ * @param {boolean=} reload
+ * @return {Promise<PDFLib.PDFDocument>}
+ */
+Zga.PdfCryptor.prototype.encryptPdf = function(pdf, reload){};
+

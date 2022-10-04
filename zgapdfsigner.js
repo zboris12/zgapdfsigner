@@ -18,7 +18,6 @@ z.TSAURLS = {
 
 z.PdfSigner = class{
 	/**
-	 * @constructor
 	 * @param {SignOption} signopt
 	 */
 	constructor(signopt){
@@ -26,7 +25,7 @@ z.PdfSigner = class{
 		this.DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
 		/** @private @type {SignOption} */
 		this.opt = signopt;
-		/** @private @type {TsaServiceInfo} */
+		/** @private @type {?TsaServiceInfo} */
 		this.tsainf = null;
 		/** @private @type {number} */
 		this.siglen = 0;
@@ -47,7 +46,7 @@ z.PdfSigner = class{
 					url: signopt.signdate,
 				};
 			}else if(signopt.signdate.url){
-				this.tsainf = Object.assign({}, signopt.signdate);
+				this.tsainf = /** @type {TsaServiceInfo} */(Object.assign({}, signopt.signdate));
 			}
 		}
 		if(this.tsainf){
@@ -150,7 +149,7 @@ z.PdfSigner = class{
 	 * @param {PDFLib.PDFDocument} pdfdoc
 	 */
 	addSignHolder(pdfdoc){
-		/** @const {VisualSignature} */
+		/** @const {z.VisualSignature} */
 		const visign = new z.VisualSignature(this.opt.drawinf);
 		/** @const {PDFLib.PDFRef} */
 		const strmRef = visign.createStream(pdfdoc, this.opt.signame);
@@ -170,7 +169,7 @@ z.PdfSigner = class{
 		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
 		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
 
-		this.siglen = this.tsainf ? this.tsainf.len : 3322;
+		this.siglen = /** @type {number} */(this.tsainf ? this.tsainf.len : 3322);
 		this.sigContents = PDFLib.PDFHexString.of("0".repeat(this.siglen));
 
 		/** @type {Object<string, *>} */
@@ -239,13 +238,13 @@ z.PdfSigner = class{
 		var istgt = false;
 		/** @type {PDFLib.PDFHexString} */
 		var sigContents = null;
-		/** @type {Array<*>} */
+		/** @type {Array<PdfObjEntry>} */
 		var objarr = pdfdoc.context.enumerateIndirectObjects();
 		for(var i=objarr.length - 1; i>= 0; i--){
 			if(objarr[i][1].dict instanceof Map){
-				/** @type {Iterator} */
+				/** @type {Iterator<PdfObjEntry>} */
 				var es = objarr[i][1].dict.entries();
-				/** @type {IteratorResult} */
+				/** @type {IIterableResult<PdfObjEntry>} */
 				var res = es.next();
 				istgt = false;
 				sigContents = null;
@@ -272,6 +271,7 @@ z.PdfSigner = class{
 				}
 			}
 		}
+		return null;
 	}
 
 	/**
@@ -287,24 +287,35 @@ z.PdfSigner = class{
 		}
 
 		// Finds ByteRange information within a given PDF Buffer if one exists
+		/** @type {Array<string>} */
 		var byteRangeStrings = pdfstr.match(/\/ByteRange\s*\[{1}\s*(?:(?:\d*|\/\*{10})\s+){3}(?:\d+|\/\*{10}){1}\s*]{1}/g);
+		/** @type {string|undefined} */
 		var byteRangePlaceholder = byteRangeStrings.find(function(a_str){
 			return a_str.includes("/"+this.DEFAULT_BYTE_RANGE_PLACEHOLDER);
 		}.bind(this));
 		if(!byteRangePlaceholder){
 			throw new Error("no signature placeholder");
 		}
+		/** @type {number} */
 		var byteRangePos = pdfstr.indexOf(byteRangePlaceholder);
+		/** @type {number} */
 		var byteRangeEnd = byteRangePos + byteRangePlaceholder.length;
+		/** @type {number} */
 		var contentsTagPos = pdfstr.indexOf('/Contents ', byteRangeEnd);
+		/** @type {number} */
 		var placeholderPos = pdfstr.indexOf('<', contentsTagPos);
+		/** @type {number} */
 		var placeholderEnd = pdfstr.indexOf('>', placeholderPos);
+		/** @type {number} */
 		var placeholderLengthWithBrackets = placeholderEnd + 1 - placeholderPos;
+		/** @type {number} */
 		var placeholderLength = placeholderLengthWithBrackets - 2;
+		/** @type {Array<number>} */
 		var byteRange = [0, 0, 0, 0];
 		byteRange[1] = placeholderPos;
 		byteRange[2] = byteRange[1] + placeholderLengthWithBrackets;
 		byteRange[3] = pdfstr.length - byteRange[2];
+		/** @type {string} */
 		var actualByteRange = "/ByteRange [" + byteRange.join(" ") +"]";
 		actualByteRange += ' '.repeat(byteRangePlaceholder.length - actualByteRange.length);
 		// Replace the /ByteRange placeholder with the actual ByteRange
@@ -316,20 +327,26 @@ z.PdfSigner = class{
 			this.opt.p12cert = z.u8arrToRaw(new Uint8Array(this.opt.p12cert));
 		}
 		// Convert Buffer P12 to a forge implementation.
+		/** @type {forge.asn1} */
 		var p12Asn1 = forge.asn1.fromDer(this.opt.p12cert);
+		/** @type {forge.pkcs12} */
 		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, this.opt.pwd);
 
 		// Extract safe bags by type.
 		// We will need all the certificates and the private key.
+		/** @type {Object<string|number, P12Bag>} */
 		var certBags = p12.getBags({
 			"bagType": forge.pki.oids.certBag,
 		})[forge.pki.oids.certBag];
+		/** @type {Object<string|number, P12Bag>} */
 		var keyBags = p12.getBags({
 			"bagType": forge.pki.oids.pkcs8ShroudedKeyBag,
 		})[forge.pki.oids.pkcs8ShroudedKeyBag];
 
+		/** @type {forge_key} */
 		var privateKey = keyBags[0].key;
 		// Here comes the actual PKCS#7 signing.
+		/** @type {forge.pkcs7} */
 		var p7 = forge.pkcs7.createSignedData();
 		// Start off by setting the content.
 		p7.content = forge.util.createBuffer(pdfstr);
@@ -337,18 +354,22 @@ z.PdfSigner = class{
 		// Then add all the certificates (-cacerts & -clcerts)
 		// Keep track of the last found client certificate.
 		// This will be the public key that will be bundled in the signature.
+		/** @type {forge_cert} */
 		var cert = null;
-		Object.keys(certBags).forEach(function(a_ele){
-			var a_cert = certBags[a_ele].cert;
+		if(certBags){
+			Object.keys(certBags).forEach(function(a_ele){
+				/** @type {forge_cert} */
+				var a_cert = certBags[a_ele].cert;
 
-			p7.addCertificate(a_cert);
+				p7.addCertificate(a_cert);
 
-			// Try to find the certificate that matches the private key.
-			if(privateKey.n.compareTo(a_cert.publicKey.n) === 0
-			&& privateKey.e.compareTo(a_cert.publicKey.e) === 0){
-				cert = a_cert;
-			}
-		});
+				// Try to find the certificate that matches the private key.
+				if(privateKey.n.compareTo(a_cert.publicKey.n) === 0
+				&& privateKey.e.compareTo(a_cert.publicKey.e) === 0){
+					cert = a_cert;
+				}
+			});
+		}
 		if(cert){
 			// When converting to asn1, forge will encode the value of issuer to utf8 if the valueTagClass is UTF8.
 			// But the value load from pfx is already utf8 encoded, so the encoding action will break the final signature.
@@ -389,6 +410,7 @@ z.PdfSigner = class{
 		p7.sign({"detached": true});
 
 		if(this.tsainf){
+			/** @type {forge.asn1} */
 			var tsatoken = this.queryTsa(p7.signers[0].signature);
 			p7.signerInfos[0].value[6].value[0].value[1] = forge.asn1.create(
 				forge.asn1.Class.UNIVERSAL,
@@ -400,6 +422,7 @@ z.PdfSigner = class{
 		}
 
 		// Check if the PDF has a good enough placeholder to fit the signature.
+		/** @type {string} */
 		var sighex = forge.asn1.toDer(p7.toAsn1()).toHex();
 		// placeholderLength represents the length of the HEXified symbols but we're
 		// checking the actual lengths.
@@ -425,6 +448,7 @@ z.PdfSigner = class{
 	 */
 	convToPDFString(str){
 		// Check if there is a multi-bytes char in the string.
+		/** @type {boolean} */
 		var flg = false;
 		for(var i=0; i<str.length; i++){
 			if(str.charCodeAt(i) > 0xFF){
@@ -441,14 +465,16 @@ z.PdfSigner = class{
 
 	/**
 	 * @private
-	 * @param {string} signature
+	 * @param {string=} signature
 	 * @return {string}
 	 */
 	genTsrData(signature){
 		// Generate SHA256 hash from signature content for TSA
+		/** @type {forge.md.digest} */
 		var md = forge.md.sha256.create();
 		md.update(signature);
 		// Generate TSA request
+		/** @type {forge.asn1} */
 		var asn1Req = forge.asn1.create(
 			forge.asn1.Class.UNIVERSAL,
 			forge.asn1.Type.SEQUENCE,
@@ -511,19 +537,25 @@ z.PdfSigner = class{
 
 	/**
 	 * @private
-	 * @param {string} signature
-	 * @return {Object}
+	 * @param {string=} signature
+	 * @return {forge.asn1}
 	 */
 	queryTsa(signature){
+		/** @type {string} */
 		var tsr = this.genTsrData(signature);
+		/** @type {Uint8Array} */
 		var tu8s = z.rawToU8arr(tsr);
+		/** @type {UrlFetchParams} */
 		var options = {
 			"method": "POST",
 			"headers": {"Content-Type": "application/timestamp-query"},
 			"payload": tu8s,
 		};
+		/** @type {GBlob} */
 		var tblob = UrlFetchApp.fetch(this.tsainf.url, options).getBlob();
+		/** @type {string} */
 		var tstr = z.u8arrToRaw(new Uint8Array(tblob.getBytes()));
+		/** @type {forge.asn1} */
 		var token = forge.asn1.fromDer(tstr).value[1];
 		return token;
 	}
@@ -541,7 +573,6 @@ z.PdfSigner = class{
 
 z.VisualSignature = class{
 	/**
-	 * @constructor
 	 * @param {SignDrawInfo=} drawinf
 	 */
 	constructor(drawinf){
@@ -549,7 +580,7 @@ z.VisualSignature = class{
 		this.pgidx = 0;
 		/** @private @type {Array<number>} */
 		this.rect = [0, 0, 0, 0];
-		/** @private @type {SignDrawInfo} */
+		/** @private @type {?SignDrawInfo} */
 		this.drawinf = null;
 
 		if(drawinf){
@@ -598,21 +629,29 @@ z.VisualSignature = class{
 		}else{
 			throw new Error("Page index is overflow to pdf pages.");
 		}
+		/** @type {PDFLib.Rotation} */
 		var pgrot = page.getRotation();
 		pgrot.angle = PDFLib.toDegrees(pgrot) % 360;
 		pgrot.type = PDFLib.RotationTypes.Degrees;
+		/** @type {PdfSize} */
 		var pgsz = page.getSize();
+		/** @type {SignAreaInfo} */
 		var areainf = this.calcAreaInf(pgsz, pgrot.angle, this.drawinf.area);
 
 		// resources object
+		/** @type {Object<string, *>} */
 		var rscObj = {};
 		/** @type {Array<PDFLib.PDFOperator>} */
 		var sigOprs = [];
+		/** @type {string} */
 		var imgName = signame ? signame.concat("Img") : "SigImg";
+		/** @type {string} */
 		var fontName = signame ? signame.concat("Font") : "SigFont";
 		if(this.drawinf.img){
 			// Get scaled image size
+			/** @type {PdfSize} */
 			var imgsz = this.drawinf.img.size();
+			/** @type {number} */
 			var tmp = areainf.w * imgsz.height / imgsz.width;
 			if(tmp <= areainf.h){
 				areainf.h = tmp;
@@ -633,6 +672,7 @@ z.VisualSignature = class{
 
 		this.rect = this.calcRect(pgrot.angle, areainf);
 
+		/** @type {PDFLib.PDFObject} */
 		var frmDict = pdfdoc.context.obj({
 			"Type": "XObject",
 			"Subtype": "Form",
@@ -640,6 +680,7 @@ z.VisualSignature = class{
 			"BBox": [0, 0, areainf.w, areainf.h],
 			"Resources": rscObj,
 		});
+		/** @type {PDFLib.PDFContentStream} */
 		var strm = PDFLib.PDFContentStream.of(frmDict, sigOprs, false);
 		return pdfdoc.context.register(strm);
 	}
@@ -648,13 +689,13 @@ z.VisualSignature = class{
 	 * Calculate area informations for drawing signature after rotate
 	 *
 	 * @private
-	 * @param {Object<string, number>} pgsz // { width, height }
+	 * @param {PdfSize} pgsz
 	 * @param {number} angle
 	 * @param {SignAreaInfo} visinf
 	 * @return {SignAreaInfo}
 	 */
 	calcAreaInf(pgsz, angle, visinf){
-		var ret = Object.assign({}, visinf);
+		var ret = /** @type {SignAreaInfo} */(Object.assign({}, visinf));
 		// Calculate position after rotate
 		switch(angle){
 		case 90:
@@ -688,6 +729,7 @@ z.VisualSignature = class{
 	 * @return {Array<number>}
 	 */
 	calcRect(angle, areainf){
+		/** @type {Array<number>} */
 		var rect = [0, 0, 0, 0];
 		rect[0] = areainf.x;
 		rect[1] = areainf.y;
@@ -719,9 +761,10 @@ z.VisualSignature = class{
 	 * @private
 	 * @param {PDFLib.Rotation} rot
 	 * @param {SignAreaInfo} areainf // { x, y, w, h }
-	 * @return {Object<string, *>} // { x, y, width, height, rotate, xSkew, ySkew }
+	 * @return {PdfDrawimgOption}
 	 */
 	calcDrawImgInf(rot, areainf){
+		/** @type {PdfDrawimgOption} */
 		var ret = {
 			"x": 0,
 			"y": 0,

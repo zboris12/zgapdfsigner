@@ -14,11 +14,11 @@ z.loadPdf = async function(pdf){
 	/** @type {PDFLib.PDFDocument} */
 	var pdfdoc = null;
 	if(pdf.addPage){
-		pdfdoc = pdf;
+		pdfdoc = /** @type {PDFLib.PDFDocument} */(pdf);
 	}else if(Array.isArray(pdf)){
 		pdfdoc = await PDFLib.PDFDocument.load(new Uint8Array(pdf));
 	}else{
-		pdfdoc = await PDFLib.PDFDocument.load(pdf);
+		pdfdoc = await PDFLib.PDFDocument.load(/** @type {(ArrayBuffer|Uint8Array|string)} */(pdf));
 	}
 	return pdfdoc;
 };
@@ -41,6 +41,7 @@ z.u8arrToRaw = function(uarr){
  * @return {Uint8Array}
  */
 z.rawToU8arr = function(raw){
+	/** @type {Uint8Array} */
 	var arr = new Uint8Array(raw.length);
 	for(var i=0; i<raw.length; i++){
 		arr[i] = raw.charCodeAt(i);
@@ -86,9 +87,12 @@ z.Crypto = {
 		if(!s){
 			return s;
 		}
+		/** @const {Array<string>} */
 		const CHARS = "\\()".split("");
+		/** @type {Array<string>} */
 		var arr = [];
 		for(var i=0; i<s.length; i++){
+			/** @type {string} */
 			var c = s.charAt(i);
 			if(c == "\r"){
 				arr.push("\\r");
@@ -108,6 +112,7 @@ z.Crypto = {
 	 * @return {string} containing random data
 	 */
 	getRandomSeed: function(seed){
+		/** @type {string} */
 		var ret = forge.random.getBytesSync(256);
 		if(seed){
 			ret += seed;
@@ -127,10 +132,14 @@ z.Crypto = {
 	_RC4: function(key, txt, lastinf){
 		/** @type {Array<number>} */
 		var rc4 = null;
+		/** @type {number} */
 		var i = 0;
+		/** @type {number} */
 		var j = 0;
+		/** @type {number} */
 		var t = 0;
 		if(lastinf.enckey != key){
+			/** @type {string} */
 			var k = key.repeat(256 / key.length + 1);
 			rc4 = new Array(256);
 			// Initialize rc4
@@ -148,9 +157,13 @@ z.Crypto = {
 		}else{
 			rc4 = [].concat(lastinf.enckeyc);
 		}
+		/** @type {number} */
 		var len = txt.length;
+		/** @type {number} */
 		var a = 0;
+		/** @type {number} */
 		var b = 0;
+		/** @type {string} */
 		var out = "";
 		for(i=0; i<len; i++){
 			a = (a + 1) % 256;
@@ -167,14 +180,16 @@ z.Crypto = {
 	/**
 	 * Return the permission code used on encryption (P value).
 	 *
-	 * @param {Array<Zga.Crypto.Permission>=} permissions the set of permissions (specify the ones you want to block).
-	 * @param {Zga.Crypto.Mode=} mode
+	 * @param {Array<string>=} permissions the set of permissions (specify the ones you want to block).
+	 * @param {z.Crypto.Mode=} mode
 	 * @return {number}
 	 */
 	getUserPermissionCode: function(permissions, mode){
+		/** @type {number} */
 		var protection = 2147422012; // 32 bit: (01111111 11111111 00001111 00111100)
 		if(permissions){
 			permissions.forEach(function(a_itm){
+				/** @type {number} */
 				var a_p = z.Crypto.Permission[a_itm];
 				if(a_p){
 					if(mode > 0 || a_p <= 32){
@@ -198,6 +213,7 @@ z.Crypto = {
 	 * @return {string}
 	 */
 	getEncPermissionsString: function(protection){
+		/** @type {forge.util.ByteStringBuffer} */
 		var buff = new forge.util.ByteStringBuffer();
 		buff.putInt32Le(protection);
 		return buff.getBytes();
@@ -209,6 +225,7 @@ z.Crypto = {
 	 * @return {string} MD5 encrypted binary string
 	 */
 	_md5_16: function(str){
+		/** @type {forge.md.digest} */
 		var md = forge.md.md5.create();
 		md.update(str);
 		return md.digest().getBytes();
@@ -223,13 +240,17 @@ z.Crypto = {
 	 */
 	_AES: function(key, txt){
 		// padding (RFC 2898, PKCS #5: Password-Based Cryptography Specification Version 2.0)
-		/** @type {string} */
+		/** @type {number} */
 		var padding = 16 - (txt.length % 16);
+		/** @type {forge.util.ByteStringBuffer} */
 		var buff = forge.util.createBuffer(txt);
 		buff.fillWithByte(padding, padding);
 
+		/** @type {string} */
 		var iv = forge.random.getBytesSync(16);
+		/** @type {forge.util.ByteStringBuffer} */
 		var key2 = forge.util.createBuffer(key);
+		/** @type {forge.cipher.BlockCipher} */
 		var cipher = forge.cipher.createCipher("AES-CBC", key2);
 		cipher.start({iv: iv});
 		cipher.update(buff);
@@ -245,9 +266,13 @@ z.Crypto = {
 	 * @return {string} encrypted text
 	 */
 	_AESnopad: function(key, txt) {
+		/** @type {forge.util.ByteStringBuffer} */
 		var buff = forge.util.createBuffer(txt);
+		/** @type {string} */
 		var iv = String.fromCharCode(0).repeat(16);
+		/** @type {forge.util.ByteStringBuffer} */
 		var key2 = forge.util.createBuffer(key);
+		/** @type {forge.cipher.BlockCipher} */
 		var cipher = forge.cipher.createCipher("AES-CBC", key2);
 		cipher.start({iv: iv});
 		cipher.update(buff);
@@ -259,18 +284,17 @@ z.Crypto = {
 
 z.PdfCryptor = class{
 	/**
-	 * @constructor
 	 * @param {EncryptOption} encopt
 	 */
 	constructor(encopt){
 		/** @private @type {string} */
 		this.fileid = "";
 		/** @private @type {string} */
-		this.key = null;
-		/** @private @type {Array<PubKeyInfo>} */
+		this.key = "";
+		/** @private @type {Array<PubKeyInfo>|undefined} */
 		this.pubkeys = encopt.pubkeys;
-		/** @private @type {number} */
-		this.mode = encopt.mode;
+		/** @private @type {z.Crypto.Mode} */
+		this.mode = /** @type {z.Crypto.Mode} */(encopt.mode);
 		/** @private @type {number} */
 		this.protection = 0;
 		/** @private @type {string} */
@@ -289,7 +313,7 @@ z.PdfCryptor = class{
 		this.V = 1;
 		/** @private @type {number} */
 		this.Length = 0;
-		/** @private @type {CFType} */
+		/** @private @type {?CFType} */
 		this.CF = null;
 		/** @private @type {string} */
 		this.SubFilter = "";
@@ -325,7 +349,6 @@ z.PdfCryptor = class{
 		};
 
 		if(this.pubkeys){
-			throw new Error("Public key mode is not supported yet.");
 			if(this.mode == z.Crypto.Mode.RC4_40){
 				// public-Key Security requires at least 128 bit
 				this.mode = z.Crypto.Mode.RC4_128;
@@ -333,6 +356,7 @@ z.PdfCryptor = class{
 			this.Filter = "Adobe.PubSec";
 			this.StmF = "DefaultCryptFilter";
 			this.StrF = "DefaultCryptFilter";
+			throw new Error("Public key mode is not supported yet.");
 		}
 
 		if(encopt.userpwd){
@@ -341,6 +365,7 @@ z.PdfCryptor = class{
 		if(encopt.ownerpwd){
 			this.ownerpwd = encopt.ownerpwd;
 		}else{
+			/** @type {forge.md.digest} */
 			var md = forge.md.md5.create();
 			md.update(z.Crypto.getRandomSeed());
 			this.ownerpwd = md.digest().toHex();
@@ -379,6 +404,8 @@ z.PdfCryptor = class{
 				this.Recipients = [];
 			}
 			break;
+		default:
+			throw new Error("Unknown crypto mode. " + this.mode);
 		}
 
 		this.protection = z.Crypto.getUserPermissionCode(encopt.permissions, this.mode);
@@ -411,7 +438,7 @@ z.PdfCryptor = class{
 
 		/**
 		 * @param {number} a_num
-		 * @param {*} a_val
+		 * @param {PDFLib.PDFObject} a_val
 		 */
 		var func = function(a_num, a_val){
 			if(a_val instanceof PDFLib.PDFStream){
@@ -430,7 +457,7 @@ z.PdfCryptor = class{
 			if(a_val.dict instanceof Map){
 				/** @type {Iterator} */
 				var a_es = a_val.dict.entries();
-				/** @type {IteratorResult} */
+				/** @type {IIterableResult<PdfObjEntry>} */
 				var a_res = a_es.next();
 				while(!a_res.done){
 					func(a_num, a_res.value[1]);
@@ -438,7 +465,7 @@ z.PdfCryptor = class{
 				}
 			}
 		}.bind(this);
-		pdfcont.enumerateIndirectObjects().forEach(function(a_arr){
+		pdfcont.enumerateIndirectObjects().forEach(function(/** @type {PdfObjEntry} */a_arr){
 			func(a_arr[0].objectNumber, a_arr[1]);
 		});
 
@@ -456,12 +483,17 @@ z.PdfCryptor = class{
 	 */
 	prepareEncrypt(pdfcont){
 		if(!pdfcont.trailerInfo.ID){
+			/** @type {forge.md.digest} */
 			var md = forge.md.md5.create();
 			md.update(z.Crypto.getRandomSeed());
+			/** @type {forge.util.ByteStringBuffer} */
 			var res = md.digest();
+			/** @type {string} */
 			var idhex = res.toHex();
+			/** @type {string} */
 			this.fileid = res.getBytes();
 
+			/** @type {PDFLib.PDFArray} */
 			var trIds = new PDFLib.PDFArray(pdfcont);
 			trIds.push(PDFLib.PDFHexString.of(idhex));
 			trIds.push(PDFLib.PDFHexString.of(idhex));
@@ -484,6 +516,7 @@ z.PdfCryptor = class{
 		if(this.V >= 4){
 			// A dictionary whose keys shall be crypt filter names and whose values shall be the corresponding crypt filter dictionaries.
 			if(this.CF){
+				/** @type {Object<string, *>} */
 				var objStmF = {
 					Type: "CryptFilter",
 				};
@@ -492,11 +525,11 @@ z.PdfCryptor = class{
 					objStmF.CFM = this.CF.CFM;
 					if(this.pubkeys){
 						/** @type {PDFLib.PDFArray} */
-						var recps = new PDFLib.PDFArray(pdfcont);
+						var recps1 = new PDFLib.PDFArray(pdfcont);
 						this.Recipients.forEach(function(a_ele){
-							recps.push(PDFLib.PDFHexString.of(a_ele));
+							recps1.push(PDFLib.PDFHexString.of(a_ele));
 						});
-						objStmF.Recipients = recps;
+						objStmF.Recipients = recps1;
 						if(typeof this.CF.EncryptMetadata == "boolean" && !this.CF.EncryptMetadata){
 							objStmF.EncryptMetadata = false;
 						}else{
@@ -517,6 +550,7 @@ z.PdfCryptor = class{
 					objStmF.Length = this.CF.Length;
 				}
 
+				/** @type {Object<string, *>} */
 				var objCF = {
 					[this.StmF]: pdfcont.obj(objStmF),
 				};
@@ -569,7 +603,9 @@ z.PdfCryptor = class{
 	 * @return {Uint8Array}
 	 */
 	encryptU8arr(num, dat){
+		/** @type {string} */
 		var str = z.u8arrToRaw(dat);
+		/** @type {string} */
 		var enc = this._encrypt_data(num, str);
 		return z.rawToU8arr(enc);
 	}
@@ -581,7 +617,9 @@ z.PdfCryptor = class{
 	 * @return {string}
 	 */
 	encryptHexstr(num, dat){
+		/** @type {string} */
 		var str = forge.util.hexToBytes(dat);
+		/** @type {string} */
 		var enc = this._encrypt_data(num, str);
 		return forge.util.createBuffer(enc).toHex();
 	}
@@ -595,6 +633,7 @@ z.PdfCryptor = class{
 	 * @return {string} object key
 	 */
 	_objectkey(n){
+		/** @type {forge.util.ByteStringBuffer} */
 		var buff = forge.util.createBuffer(this.key);
 		//pack('VXxx', $n)
 		buff.putInt24Le(n);
@@ -604,8 +643,10 @@ z.PdfCryptor = class{
 			buff.putBytes("sAlT");
 		}
 
+		/** @type {forge.md.digest} */
 		var md = forge.md.md5.create();
 		md.update(buff.getBytes());
+		/** @type {forge.util.ByteStringBuffer} */
 		var ret = md.digest();
 		return ret.getBytes().substr(0, Math.min(16, (this.Length / 8) + 5));
 	}
@@ -640,13 +681,19 @@ z.PdfCryptor = class{
 	 * @return {string} U value
 	 */
 	_Uvalue(){
+		/** @type {string} */
+		var ret = "";
 		if(this.mode == z.Crypto.Mode.RC4_40){
-			return z.Crypto._RC4(this.key, z.Crypto.EncPadding, this.rc4inf);
+			ret = z.Crypto._RC4(this.key, z.Crypto.EncPadding, this.rc4inf);
 		}else if(this.mode < z.Crypto.Mode.AES_256) { // RC4-128, AES-128
+			/** @type {string} */
 			var tmp = z.Crypto._md5_16(z.Crypto.EncPadding + this.fileid);
+			/** @type {string} */
 			var enc = z.Crypto._RC4(this.key, tmp, this.rc4inf);
+			/** @type {number} */
 			var len = tmp.length;
 			for(var i=1; i<=19; i++){
+				/** @type {string} */
 				var ek = "";
 				for(var j=0; j<len; j++){
 					ek += String.fromCharCode(this.key.charCodeAt(j) ^ i);
@@ -654,19 +701,24 @@ z.PdfCryptor = class{
 				enc = z.Crypto._RC4(ek, enc, this.rc4inf);
 			}
 			enc += String.fromCharCode(0).repeat(16);
-			return enc.substr(0, 32);
+			ret = enc.substr(0, 32);
 
 		}else if(this.mode == z.Crypto.Mode.AES_256){
+			/** @type {string} */
 			var seed = z.Crypto._md5_16(z.Crypto.getRandomSeed());
 			// User Validation Salt
+			/** @type {string} */
 			this.UVS = seed.substr(0, 8);
 			// User Key Salt
+			/** @type {string} */
 			this.UKS = seed.substr(8, 16);
 
+			/** @type {forge.md.digest} */
 			var md = forge.md.sha256.create();
 			md.update(this.userpwd + this.UVS);
-			return md.digest().getBytes() + this.UVS + this.UKS;
+			ret = md.digest().getBytes() + this.UVS + this.UKS;
 		}
+		return ret;
 	}
 
 	/**
@@ -675,6 +727,7 @@ z.PdfCryptor = class{
 	 * @return {string} UE value
 	 */
 	_UEvalue(){
+		/** @type {forge.md.digest} */
 		var md = forge.md.sha256.create();
 		md.update(this.userpwd + this.UKS);
 		return z.Crypto._AESnopad(md.digest().getBytes(), this.key);
@@ -686,37 +739,47 @@ z.PdfCryptor = class{
 	 * @return {string} O value
 	 */
 	_Ovalue(){
+		/** @type {string} */
+		var ret = "";
 		if(this.mode < z.Crypto.Mode.AES_256){ // RC4-40, RC4-128, AES-128
+			/** @type {string} */
 			var tmp = z.Crypto._md5_16(this.ownerpwd);
 			if(this.mode > z.Crypto.Mode.RC4_40){
 				for(var i=0; i<50; i++){
 					tmp = z.Crypto._md5_16(tmp);
 				}
 			}
+			/** @type {string} */
 			var owner_key = tmp.substr(0, this.Length / 8);
-			var enc = z.Crypto._RC4(owner_key, this.userpwd, this.rc4inf);
+			ret = z.Crypto._RC4(owner_key, this.userpwd, this.rc4inf);
 			if(this.mode > z.Crypto.Mode.RC4_40){
+				/** @type {number} */
 				var len = owner_key.length;
 				for(var i=1; i<=19; i++){
+					/** @type {string} */
 					var ek = "";
 					for(var j=0; j<len; j++){
 						ek += String.fromCharCode(owner_key.charCodeAt(j) ^ i);
 					}
-					enc = z.Crypto._RC4(ek, enc, this.rc4inf);
+					ret = z.Crypto._RC4(ek, ret, this.rc4inf);
 				}
 			}
-			return enc;
 		}else if(this.mode == z.Crypto.Mode.AES_256){
+			/** @type {string} */
 			var seed = z.Crypto._md5_16(z.Crypto.getRandomSeed());
 			// Owner Validation Salt
+			/** @type {string} */
 			this.OVS = seed.substr(0, 8);
 			// Owner Key Salt
+			/** @type {string} */
 			this.OKS = seed.substr(8, 16);
 
+			/** @type {forge.md.digest} */
 			var md = forge.md.sha256.create();
 			md.update(this.ownerpwd + this.OVS + this.U);
-			return md.digest().getBytes() + this.OVS + this.OKS;
+			ret = md.digest().getBytes() + this.OVS + this.OKS;
 		}
+		return ret;
 	}
 
 	/**
@@ -725,6 +788,7 @@ z.PdfCryptor = class{
 	 * @return {string} OE value
 	 */
 	_OEvalue(){
+		/** @type {forge.md.digest} */
 		var md = forge.md.sha256.create();
 		md.update(this.ownerpwd + this.OKS + this.U);
 		return z.Crypto._AESnopad(md.digest().getBytes(), this.key);
@@ -745,11 +809,13 @@ z.PdfCryptor = class{
 	 * @private
 	 */
 	_generateencryptionkey(){
+		/** @type {number} */
 		var keybytelen = this.Length / 8;
 		// standard mode
 		if(!this.pubkeys){
 			if(this.mode == z.Crypto.Mode.AES_256){
 				// generate 256 bit random key
+				/** @type {forge.md.digest} */
 				var md = forge.md.sha256.create();
 				md.update(z.Crypto.getRandomSeed());
 				this.key = md.digest().getBytes().substr(0, keybytelen);
@@ -767,6 +833,7 @@ z.PdfCryptor = class{
 				// Compute P value
 				this.P = this.protection;
 				// Computing the encryption dictionary's Perms (permissions) value
+				/** @type {string} */
 				var perms = z.Crypto.getEncPermissionsString(this.protection); // bytes 0-3
 				perms += String.fromCharCode(255).repeat(4); // bytes 4-7
 				if(typeof this.CF.EncryptMetadata == "boolean" && !this.CF.EncryptMetadata){ // byte 8
@@ -784,8 +851,10 @@ z.PdfCryptor = class{
 				// Compute O value
 				this.O = this._Ovalue();
 				// get default permissions (reverse byte order)
+				/** @type {string} */
 				var permissions = z.Crypto.getEncPermissionsString(this.protection);
 				// Compute encryption key
+				/** @type {string} */
 				var tmp = z.Crypto._md5_16(this.userpwd + this.O + permissions + this.fileid);
 				if(this.mode > z.Crypto.Mode.RC4_40) {
 					for(var i=0; i<50; i++){
