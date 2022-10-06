@@ -23,6 +23,11 @@ forge.util.ByteStringBuffer.prototype.putBytes = function(value){};
  * @param {number} i
  * @return {forge.util.ByteStringBuffer}
  */
+forge.util.ByteStringBuffer.prototype.putInt16 = function(i){};
+/**
+ * @param {number} i
+ * @return {forge.util.ByteStringBuffer}
+ */
 forge.util.ByteStringBuffer.prototype.putInt24Le = function(i){};
 /**
  * @param {number} i
@@ -58,7 +63,7 @@ forge.util.createBuffer = function(input, encoding){};
  */
 forge.util.hexToBytes = function(hex){};
 /**
- * @param {string} value
+ * @param {string=} value
  * @return {string}
  */
 forge.util.decodeUtf8 = function(value){};
@@ -153,7 +158,7 @@ forge_cert_issuer.prototype.attributes;
 /**
  * @typedef
  * {{
- *    valueTagClass: (string|undefined),
+ *    valueTagClass: (number|undefined),
  *    type: (string|undefined),
  *    value: (string|undefined),
  * }}
@@ -179,6 +184,10 @@ forge.pkcs7 = function(){};
  */
 forge.pkcs7.createSignedData = function(){};
 /**
+ * @return {forge.pkcs7}
+ */
+forge.pkcs7.createEnvelopedData = function(){};
+/**
  * @param {forge_cert} cert
  */
 forge.pkcs7.prototype.addCertificate = function(cert){};
@@ -190,6 +199,17 @@ forge.pkcs7.prototype.addSigner = function(signer){};
 forge.pkcs7.prototype.signers;
 /** @type {Array<forge.asn1>} */
 forge.pkcs7.prototype.signerInfos;
+/**
+ * @param {forge_cert} cert
+ */
+forge.pkcs7.prototype.addRecipient = function(cert){};
+/** @type {forge.util.ByteStringBuffer} */
+forge.pkcs7.prototype.content;
+/**
+ * @param {forge.util.ByteStringBuffer=} key
+ * @param {string=} cipher
+ */
+forge.pkcs7.prototype.encrypt = function(key, cipher){};
 /**
  * @typedef
  * {{
@@ -258,6 +278,12 @@ forge.pki.oids.data;
 forge.pki.oids.messageDigest;
 /** @type {string} */
 forge.pki.oids.signingTime;
+/**
+ * @param {forge.asn1} obj
+ * @param {boolean=} computeHash
+ * @return {forge_cert}
+ */
+forge.pki.certificateFromAsn1 = function(obj, computeHash){};
 
 forge.md = {};
 /** @constructor */
@@ -273,11 +299,16 @@ forge.md.digest.prototype.update = function(msg, encoding){};
  */
 forge.md.digest.prototype.digest = function(){};
 forge.md.md5 = {};
+forge.md.sha1 = {};
 forge.md.sha256 = {};
 /**
  * @return {forge.md.digest}
  */
 forge.md.md5.create = function(){};
+/**
+ * @return {forge.md.digest}
+ */
+forge.md.sha1.create = function(){};
 /**
  * @return {forge.md.digest}
  */

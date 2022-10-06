@@ -25,6 +25,12 @@ z.PdfSigner = class{
 		this.DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
 		/** @private @type {SignOption} */
 		this.opt = signopt;
+		/** @type {forge_key} */
+		this.privateKey = null;
+		/** @type {Array<forge_cert>} */
+		this.certs = [];
+		/** @type {number} */
+		this.certIdx = 0;
 		/** @private @type {?TsaServiceInfo} */
 		this.tsainf = null;
 		/** @private @type {number} */
@@ -103,7 +109,27 @@ z.PdfSigner = class{
 		this.addSignHolder(pdfdoc);
 		this.log("A signature holder has been added to the pdf.");
 
+		/** @type {forge_cert} */
+		var cert = this.loadP12cert(this.opt.p12cert, this.opt.pwd);
+		if(cert){
+			z.fixCertAttributes(cert);
+		}
+
 		if(cypopt){
+			if(cypopt.pubkeys){
+				if(cypopt.pubkeys.length == 0){
+					cypopt.pubkeys.push({
+						c: cert,
+					});
+				}else{
+					cypopt.pubkeys.forEach(function(/** @type {PubKeyInfo} */a_pubkey){
+						// If there is no c in the PubKeyInfo, set cert to it.
+						if(!a_pubkey.c){
+							a_pubkey.c = cert;
+						}
+					});
+				}
+			}
 			/** @type {Zga.PdfCryptor} */
 			var cypt = new z.PdfCryptor(cypopt);
 			pdfdoc = await cypt.encryptPdf(pdfdoc, true);
@@ -274,6 +300,59 @@ z.PdfSigner = class{
 		return null;
 	}
 
+
+	/**
+	 * @private
+	 * @param {Array<number>|Uint8Array|ArrayBuffer|string} p12cert
+	 * @param {string} pwd
+	 * @return {forge_cert}
+	 */
+	loadP12cert(p12cert, pwd){
+		// load P12 certificate
+		if(typeof p12cert !== "string"){
+			p12cert = z.u8arrToRaw(new Uint8Array(p12cert));
+		}
+		// Convert Buffer P12 to a forge implementation.
+		/** @type {forge.asn1} */
+		var p12Asn1 = forge.asn1.fromDer(p12cert);
+		/** @type {forge.pkcs12} */
+		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, pwd);
+		// Extract safe bags by type.
+		// We will need all the certificates and the private key.
+		/** @type {Object<string|number, P12Bag>} */
+		var certBags = p12.getBags({
+			"bagType": forge.pki.oids.certBag,
+		})[forge.pki.oids.certBag];
+		/** @type {Object<string|number, P12Bag>} */
+		var keyBags = p12.getBags({
+			"bagType": forge.pki.oids.pkcs8ShroudedKeyBag,
+		})[forge.pki.oids.pkcs8ShroudedKeyBag];
+		this.privateKey = keyBags[0].key;
+		if(certBags){
+			// Get all the certificates (-cacerts & -clcerts)
+			// Keep track of the last found client certificate.
+			// This will be the public key that will be bundled in the signature.
+			Object.keys(certBags).forEach(function(a_ele){
+				/** @type {forge_cert} */
+				var a_cert = certBags[a_ele].cert;
+
+				this.certs.push(a_cert);
+
+				// Try to find the certificate that matches the private key.
+				if(this.privateKey.n.compareTo(a_cert.publicKey.n) === 0
+				&& this.privateKey.e.compareTo(a_cert.publicKey.e) === 0){
+					this.certIdx = this.certs.length;
+				}
+			}.bind(this));
+		}
+		if(this.certIdx > 0){
+			return this.certs[--this.certIdx];
+			// z.fixCertAttributes(this.certs[this.certIdx]);
+		}else{
+			throw new Error("Failed to find a certificate.");
+		}
+	}
+
 	/**
 	 * @private
 	 * @param {string} pdfstr
@@ -323,70 +402,21 @@ z.PdfSigner = class{
 		// Remove the placeholder signature
 		pdfstr = pdfstr.slice(0, byteRange[1]) + pdfstr.slice(byteRange[2], byteRange[2] + byteRange[3]);
 
-		if(typeof this.opt.p12cert !== "string"){
-			this.opt.p12cert = z.u8arrToRaw(new Uint8Array(this.opt.p12cert));
-		}
-		// Convert Buffer P12 to a forge implementation.
-		/** @type {forge.asn1} */
-		var p12Asn1 = forge.asn1.fromDer(this.opt.p12cert);
-		/** @type {forge.pkcs12} */
-		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, this.opt.pwd);
-
-		// Extract safe bags by type.
-		// We will need all the certificates and the private key.
-		/** @type {Object<string|number, P12Bag>} */
-		var certBags = p12.getBags({
-			"bagType": forge.pki.oids.certBag,
-		})[forge.pki.oids.certBag];
-		/** @type {Object<string|number, P12Bag>} */
-		var keyBags = p12.getBags({
-			"bagType": forge.pki.oids.pkcs8ShroudedKeyBag,
-		})[forge.pki.oids.pkcs8ShroudedKeyBag];
-
-		/** @type {forge_key} */
-		var privateKey = keyBags[0].key;
 		// Here comes the actual PKCS#7 signing.
 		/** @type {forge.pkcs7} */
 		var p7 = forge.pkcs7.createSignedData();
 		// Start off by setting the content.
 		p7.content = forge.util.createBuffer(pdfstr);
 
-		// Then add all the certificates (-cacerts & -clcerts)
-		// Keep track of the last found client certificate.
-		// This will be the public key that will be bundled in the signature.
-		/** @type {forge_cert} */
-		var cert = null;
-		if(certBags){
-			Object.keys(certBags).forEach(function(a_ele){
-				/** @type {forge_cert} */
-				var a_cert = certBags[a_ele].cert;
-
-				p7.addCertificate(a_cert);
-
-				// Try to find the certificate that matches the private key.
-				if(privateKey.n.compareTo(a_cert.publicKey.n) === 0
-				&& privateKey.e.compareTo(a_cert.publicKey.e) === 0){
-					cert = a_cert;
-				}
-			});
-		}
-		if(cert){
-			// When converting to asn1, forge will encode the value of issuer to utf8 if the valueTagClass is UTF8.
-			// But the value load from pfx is already utf8 encoded, so the encoding action will break the final signature.
-			// To avoid the broken signature issue, we decode the value before the other actions.
-			cert.issuer.attributes.forEach(function(a_ele, a_idx, a_arr){
-				if(a_ele.valueTagClass === forge.asn1.Type.UTF8){
-					a_ele.value = forge.util.decodeUtf8(a_ele.value);
-				}
-			});
-		}else{
-			throw new Error("Failed to find a certificate.");
-		}
+		// Add all the certificates (-cacerts & -clcerts) to p7
+		this.certs.forEach(function(a_cert){
+			p7.addCertificate(a_cert);
+		});
 
 		// Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
 		p7.addSigner({
-			key: privateKey,
-			certificate: cert,
+			key: this.privateKey,
+			certificate: this.certs[this.certIdx],
 			digestAlgorithm: forge.pki.oids.sha256,
 			authenticatedAttributes: [
 				{

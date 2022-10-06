@@ -50,26 +50,26 @@ var SignOption;
 /**
  * @typedef
  * {{
- *    c: string,
+ *    c: (string|forge_cert|undefined),
  *    p: (Array<string>|undefined),
  * }}
  */
 var PubKeyInfo;
 /**
  * permissions: The set of permissions (specify the ones you want to block):
+ *  copy : (Only valid on public-key mode) Copy text and graphics from the document;
  *  print : Print the document;
  *  modify : Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble';
- *  copy : Copy or otherwise extract text and graphics from the document;
+ *  copy-extract : Copy or otherwise extract text and graphics from the document;
  *  annot-forms : Add or modify text annotations, fill in interactive form fields, and, if 'modify' is also set, create or modify interactive form fields (including signature fields);
  *  fill-forms : Fill in existing interactive form fields (including signature fields), even if 'annot-forms' is not specified;
  *  extract : Extract text and graphics (in support of accessibility to users with disabilities or for other purposes);
  *  assemble : Assemble the document (insert, rotate, or delete pages and create bookmarks or thumbnail images), even if 'modify' is not set;
  *  print-high : Print the document to a representation from which a faithful digital copy of the PDF content could be generated. When this is not set, printing is limited to a low-level representation of the appearance, possibly of degraded quality.
- *  owner : (inverted logic - only for public-key) when set permits change of encryption and enables all other permissions.
  *
  * ownerpwd: Owner password If not specified, a random value is used.
  *
- * pubkeys: Array of recipients containing public-key certificates ('c') and permissions ('p').
+ * pubkeys: Array of recipients containing public-key certificates ('c') and permissions ('p'). If want to encrypt the pdf by the certificate of signing, just apply a PubKeyInfo without c.
  *
  * @typedef
  * {{

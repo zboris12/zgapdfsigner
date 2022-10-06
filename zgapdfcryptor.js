@@ -49,6 +49,21 @@ z.rawToU8arr = function(raw){
 	return arr;
 };
 
+/**
+ * When converting to asn1, forge will encode the value of issuer to utf8 if the valueTagClass is UTF8.
+ * But the value load from a file which is DER format, is already utf8 encoded,
+ * so the encoding action will break the final data.
+ * To avoid the broken data issue, we decode the value before the later actions.
+ * @param {forge_cert} cert
+ */
+z.fixCertAttributes = function(cert){
+	cert.issuer.attributes.forEach(function(a_ele){
+		if(a_ele.valueTagClass === forge.asn1.Type.UTF8){
+			a_ele.value = forge.util.decodeUtf8(a_ele.value);
+		}
+	});
+};
+
 z.Crypto = {
 	/**
 	 * @enum {number}
@@ -64,14 +79,15 @@ z.Crypto = {
 	 * @enum {number}
 	 */
 	Permission: {
-		"owner": 2, // bit 2 -- inverted logic: cleared by default
+//		"owner": 2, // bit 2 -- inverted logic: cleared by default
+		"copy": 2, // bit 2 -- Only valid on public-key mode
 		"print": 4, // bit 3
 		"modify": 8, // bit 4
-		"copy": 16, // bit 5
+		"copy-extract": 16, // bit 5
 		"annot-forms": 32, // bit 6
 		"fill-forms": 256, // bit 9
 		"extract": 512, // bit 10
-		"assemble": 1024,// bit 11
+		"assemble": 1024,// bit 11 -- On public-key mode, it means adding, deleting or rotating pages.
 		"print-high": 2048 // bit 12
 	},
 
@@ -148,7 +164,7 @@ z.Crypto = {
 			}
 			for(i=0; i<rc4.length; i++){
 				t = rc4[i];
-				j = (j + t + k.charCodeAt(i)) % 256;
+				j = (j + t + k.charCodeAt(i)) & 0xFF;
 				rc4[i] = rc4[j];
 				rc4[j] = t;
 			}
@@ -166,12 +182,12 @@ z.Crypto = {
 		/** @type {string} */
 		var out = "";
 		for(i=0; i<len; i++){
-			a = (a + 1) % 256;
+			a = (a + 1) & 0xFF;
 			t = rc4[a];
-			b = (b + t) % 256;
+			b = (b + t) & 0xFF;
 			rc4[a] = rc4[b];
 			rc4[b] = t;
-			k = rc4[(rc4[a] + rc4[b]) % 256];
+			k = rc4[(rc4[a] + rc4[b]) & 0xFF];
 			out += String.fromCharCode(txt.charCodeAt(i) ^ k);
 		}
 		return out;
@@ -191,7 +207,7 @@ z.Crypto = {
 			permissions.forEach(function(a_itm){
 				/** @type {number} */
 				var a_p = z.Crypto.Permission[a_itm];
-				if(a_p){
+				if(a_p && a_itm != "copy"){
 					if(mode > 0 || a_p <= 32){
 						// set only valid permissions
 						if(a_p == 2){
@@ -212,10 +228,38 @@ z.Crypto = {
 	 * @param {number} protection 32bit encryption permission value (P value)
 	 * @return {string}
 	 */
-	getEncPermissionsString: function(protection){
+	getUserPermissionsString: function(protection){
 		/** @type {forge.util.ByteStringBuffer} */
 		var buff = new forge.util.ByteStringBuffer();
 		buff.putInt32Le(protection);
+		return buff.getBytes();
+	},
+
+	/**
+	 * Return a string of permissions, high-order byte first.
+	 * @param {Array<string>=} permissions the set of permissions (specify the ones you want to block).
+	 * @return {string}
+	 */
+	getCertPermissionsString: function(permissions){
+		/** 
+		 * Although the permissions is 4 bytes(32 bits), the first 2 bytes are 0xFF,0xFF,
+		 * so we only check the last 2 bytes.
+		 * @type {number}
+		 */
+		var protection = 65535; // 16 bit: (11111111 11111111)
+		if(permissions){
+			permissions.forEach(function(a_itm){
+				/** @type {number} */
+				var a_p = z.Crypto.Permission[a_itm];
+				if(a_p){
+					protection -= a_p;
+				}
+			});
+		}
+		/** @type {forge.util.ByteStringBuffer} */
+		var buff = new forge.util.ByteStringBuffer();
+		buff.fillWithByte(0xFF, 2);
+		buff.putInt16(protection);
 		return buff.getBytes();
 	},
 
@@ -241,7 +285,7 @@ z.Crypto = {
 	_AES: function(key, txt){
 		// padding (RFC 2898, PKCS #5: Password-Based Cryptography Specification Version 2.0)
 		/** @type {number} */
-		var padding = 16 - (txt.length % 16);
+		var padding = 16 - (txt.length & 0x0F);
 		/** @type {forge.util.ByteStringBuffer} */
 		var buff = forge.util.createBuffer(txt);
 		buff.fillWithByte(padding, padding);
@@ -295,8 +339,8 @@ z.PdfCryptor = class{
 		this.pubkeys = encopt.pubkeys;
 		/** @private @type {z.Crypto.Mode} */
 		this.mode = /** @type {z.Crypto.Mode} */(encopt.mode);
-		/** @private @type {number} */
-		this.protection = 0;
+		/** @private @type {Array<string>|undefined} */
+		this.permissions = encopt.permissions;
 		/** @private @type {string} */
 		this.userpwd = "";
 		/** @private @type {string} */
@@ -349,6 +393,9 @@ z.PdfCryptor = class{
 		};
 
 		if(this.pubkeys){
+			if(this.pubkeys.length == 0){
+				throw new Error("Public key information is not specified.");
+			}
 			if(this.mode == z.Crypto.Mode.RC4_40){
 				// public-Key Security requires at least 128 bit
 				this.mode = z.Crypto.Mode.RC4_128;
@@ -356,7 +403,6 @@ z.PdfCryptor = class{
 			this.Filter = "Adobe.PubSec";
 			this.StmF = "DefaultCryptFilter";
 			this.StrF = "DefaultCryptFilter";
-			throw new Error("Public key mode is not supported yet.");
 		}
 
 		if(encopt.userpwd){
@@ -407,8 +453,6 @@ z.PdfCryptor = class{
 		default:
 			throw new Error("Unknown crypto mode. " + this.mode);
 		}
-
-		this.protection = z.Crypto.getUserPermissionCode(encopt.permissions, this.mode);
 	}
 
 	/**
@@ -811,12 +855,15 @@ z.PdfCryptor = class{
 	_generateencryptionkey(){
 		/** @type {number} */
 		var keybytelen = this.Length / 8;
+		/** @type {forge.md.digest} */
+		var md = null;
 		// standard mode
 		if(!this.pubkeys){
+			/** @type {number} */
+			var protection = z.Crypto.getUserPermissionCode(this.permissions, this.mode);
 			if(this.mode == z.Crypto.Mode.AES_256){
 				// generate 256 bit random key
-				/** @type {forge.md.digest} */
-				var md = forge.md.sha256.create();
+				md = forge.md.sha256.create();
 				md.update(z.Crypto.getRandomSeed());
 				this.key = md.digest().getBytes().substr(0, keybytelen);
 				// truncate passwords
@@ -831,10 +878,10 @@ z.PdfCryptor = class{
 				// Compute OE value
 				this.OE = this._OEvalue();
 				// Compute P value
-				this.P = this.protection;
+				this.P = protection;
 				// Computing the encryption dictionary's Perms (permissions) value
 				/** @type {string} */
-				var perms = z.Crypto.getEncPermissionsString(this.protection); // bytes 0-3
+				var perms = z.Crypto.getUserPermissionsString(protection); // bytes 0-3
 				perms += String.fromCharCode(255).repeat(4); // bytes 4-7
 				if(typeof this.CF.EncryptMetadata == "boolean" && !this.CF.EncryptMetadata){ // byte 8
 					perms += "F";
@@ -850,12 +897,12 @@ z.PdfCryptor = class{
 				this.ownerpwd = (this.ownerpwd + z.Crypto.EncPadding).substr(0, 32);
 				// Compute O value
 				this.O = this._Ovalue();
-				// get default permissions (reverse byte order)
+				// get default permissions string (reverse byte order)
 				/** @type {string} */
-				var permissions = z.Crypto.getEncPermissionsString(this.protection);
+				var permissionstr = z.Crypto.getUserPermissionsString(protection);
 				// Compute encryption key
 				/** @type {string} */
-				var tmp = z.Crypto._md5_16(this.userpwd + this.O + permissions + this.fileid);
+				var tmp = z.Crypto._md5_16(this.userpwd + this.O + permissionstr + this.fileid);
 				if(this.mode > z.Crypto.Mode.RC4_40) {
 					for(var i=0; i<50; i++){
 						tmp = z.Crypto._md5_16(tmp.substr(0, keybytelen));
@@ -865,10 +912,66 @@ z.PdfCryptor = class{
 				// Compute U value
 				this.U = this._Uvalue();
 				// Compute P value
-				this.P = this.protection;
+				this.P = protection;
 			}
-		}else{ // Public-Key mode
-			//TODO
+		// Public-Key mode
+		}else{
+			// random 20-byte seed
+			md = forge.md.sha1.create();
+			md.update(z.Crypto.getRandomSeed());
+			/** @type {string} */
+			var seed = md.digest().getBytes();
+			/** @type {string} */
+			var recipient_bytes = "";
+			/** @type {string} */
+			var pkpermissionstr = z.Crypto.getCertPermissionsString(this.permissions);
+			// for each public certificate
+			this.pubkeys.forEach(function(/** @type {PubKeyInfo} */a_pubkey){
+				// get permissions string
+				/** @type {string} */
+				var a_pkpermissionstr = pkpermissionstr;
+				if(a_pubkey.p){
+					a_pkpermissionstr = z.Crypto.getCertPermissionsString(a_pubkey.p);
+				}
+				// envelope data
+				/** @type {string} */
+				var a_envelope = seed + a_pkpermissionstr;
+				/** @type {forge_cert} */
+				var a_cert = null;
+				if(typeof a_pubkey.c == "string"){
+					/** @type {forge.asn1} */
+					var a_asn1 = forge.asn1.fromDer(a_pubkey.c);
+					a_cert = forge.pki.certificateFromAsn1(a_asn1);
+					z.fixCertAttributes(a_cert);
+				}else if(a_pubkey.c){
+					a_cert = a_pubkey.c;
+				}else{
+					throw new Error("We need a certificate.");
+				}
+				// create a p7 enveloped message
+				/** @type {forge.pkcs7} */
+				var a_p7 = forge.pkcs7.createEnvelopedData();
+				// add a recipient
+				a_p7.addRecipient(a_cert);
+				// set content
+				a_p7.content = forge.util.createBuffer(a_envelope);
+				// encrypt
+				a_p7.encrypt();
+				/** @type {forge.util.ByteStringBuffer} */
+				var a_signature = forge.asn1.toDer(a_p7.toAsn1());
+				/** @type {string} */
+				var a_hexsignature = a_signature.toHex();
+				this.Recipients.push(a_hexsignature);
+				recipient_bytes += a_signature.getBytes();
+			}.bind(this));
+			// calculate encryption key
+			if(this.mode == z.Crypto.Mode.AES_256){
+				md = forge.md.sha256.create();
+			}else{ // RC4-40, RC4-128, AES-128
+				md = forge.md.sha1.create();
+			}
+			md.update(seed + recipient_bytes);
+			this.key = md.digest().getBytes().substr(0, keybytelen);
 		}
 	}
 };

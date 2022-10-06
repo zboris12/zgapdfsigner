@@ -5,13 +5,24 @@ And it also can be used in Google Apps Script.
 PS: __ZGA__ is the abbreviation of my father's name.  
 And I use this name to hope the merits from this application will be dedicated to my parents.
 
+## Main features
+
+* Sign a pdf with an invisible pkcs#7 signature.
+* Sign a pdf with a visible pkcs#7 signature by drawing an image.
+* Sign a pdf with a timestamp from TSA(Time Stamp Authority). (Only in Google Apps Script)
+* Set password protection to a pdf. Supported algorithms:
+  * 40bit RC4 Encryption
+  * 128bit RC4 Encryption
+  * 128bit AES Encryption
+  * 256bit AES Encryption
+* Set public-key certificate protection to a pdf.
+  Supported algorithms are same as the password protection.
+
 ## About signing with TSA
 
-This tool supports signing with a timestamp from TSA(Time Stamp Authority),
-but because of the CORS security restrictions in web browser,
-this function can only be used in Google Apps Script.
-
-And because node-forge hasn't supported unauthenticated attributes in pkcs7 yet,
+Because of the CORS security restrictions in web browser,
+signing with a timestamp from TSA can only be used in Google Apps Script.
+And because [node-forge](https://github.com/digitalbazaar/forge) hasn't supported unauthenticated attributes in pkcs#7 yet,
 so when use this function, [the edited version](https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/forge.min.edited.js) needs to be imported.
 
 ## The Dependencies
@@ -51,7 +62,7 @@ async function sign1(pdf, cert, pwd){
 }
 ```
 
-Sign with a visible signature of a picture.
+Sign with a visible signature of an image.
 
 ```js
 /**
@@ -152,13 +163,13 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
     * __h__: number :point_right: Height
   * __pageidx__: number :point_right: (Optional) The page index for drawing the signature
   * __imgData__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The image's data
-  * __imgType__: string :point_right: (Optional) The image's type, __only support jpg and png__
-  * __text__: string :point_right: (Optional) A text drawing on signature, __not implemented yet__
-  * __fontData__: PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The font's data for drawing text, __not implemented yet__
+  * __imgType__: string :point_right: (Optional) The image's type, <ins>only support jpg and png</ins>
+  * __text__: string :point_right: (Optional) A text drawing on signature, <ins>not implemented yet</ins>
+  * __fontData__: PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The font's data for drawing text, <ins>not implemented yet</ins>
 
 ## Let's protect the pdf
 
-Set protection to the pdf.
+Set password protection to the pdf.
 
 ```js
 /**
@@ -174,6 +185,30 @@ async function protect1(pdf, upwd, opwd){
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     userpwd: upwd,
     ownerpwd: opwd,
+  };
+  var cyptor = new Zga.PdfCryptor(eopt);
+  var pdfdoc = await cyptor.encryptPdf(pdf);
+  u8arr = await pdfdoc.save({"useObjectStreams": false});
+  return new Blob([u8arr], {"type" : "application/pdf"});
+}
+```
+
+Set public-key certificate protection to the pdf.
+
+```js
+/**
+ * @param {ArrayBuffer} pdf
+ * @param {ArrayBuffer} cert
+ * @return {Promise<Blob>}
+ */
+async function protect1(pdf, cert){
+  /** @type {EncryptOption} */
+  var eopt = {
+    mode: Zga.Crypto.Mode.AES_128,
+    pubkeys: [{
+      c: Zga.u8arrToRaw(new Uint8Array(cert)),
+      p: ["copy", "modify", "copy-extract", "annot-forms", "fill-forms", "extract", "assemble"],
+    }],
   };
   var cyptor = new Zga.PdfCryptor(eopt);
   var pdfdoc = await cyptor.encryptPdf(pdf);
@@ -217,24 +252,25 @@ async function sign1(pdf, cert, pwd, opwd){
   * RC4_128: 128bit RC4 Encryption
   * AES_128: 128bit AES Encryption
   * AES_256: 256bit AES Encryption
-* __permissions__: Array<Zga.Crypto.Permission> :point_right: (Optional) The set of permissions you want to block
+* __permissions__: Array<string> :point_right: (Optional) The set of permissions you want to block
+  * "copy": (Only valid on public-key mode) Copy text and graphics from the document;
   * "print": Print the document;
   * "modify": Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble';
-  * "copy": Copy or otherwise extract text and graphics from the document;
+  * "copy-extract": Copy or otherwise extract text and graphics from the document;
   * "annot-forms": Add or modify text annotations, fill in interactive form fields, and, if 'modify' is also set, create or modify interactive form fields (including signature fields);
   * "fill-forms": Fill in existing interactive form fields (including signature fields), even if 'annot-forms' is not specified;
   * "extract": Extract text and graphics (in support of accessibility to users with disabilities or for other purposes);
   * "assemble": Assemble the document (insert, rotate, or delete pages and create bookmarks or thumbnail images), even if 'modify' is not set;
   * "print-high": Print the document to a representation from which a faithful digital copy of the PDF content could be generated. When this is not set, printing is limited to a low-level representation of the appearance, possibly of degraded quality.
-  * "owner": (inverted logic - only for public-key) when set permits change of encryption and enables all other permissions.
 * __userpwd__: string :point_right: (Optional) User password. Used when opening the pdf.
 * __ownerpwd__: string :point_right: (Optional) Owner password. If not specified, a random value is used.
-* __pubkeys__: Array<_PubKeyInfo_> :point_right: (Optional) Array of recipients containing public-key certificates ('c') and permissions ('p'). <ins>Not supported yet.</ins>
-  * __c__: string :point_right: A public-key certificate
-  * __p__: Array<Zga.Crypto.Permission> :point_right: (Optional) Permissions
+* __pubkeys__: Array<_PubKeyInfo_> :point_right: (Optional) Array of recipients containing public-key certificates ('c') and permissions ('p').
+  * __c__: string|forge_cert :point_right: (Optional) A public-key certificate.
+           Only if you want to encrypt the pdf by the certificate for signing, the c can be omitted.
+  * __p__: Array<string> :point_right: (Optional) Permissions
 
 ## Thanks
-* The module of setting protection was migrated from [TCPDF](http://www.tcpdf.org).
+* The module of setting protection was almost migrated from [TCPDF](http://www.tcpdf.org).
 
 ## License
 
