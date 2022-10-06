@@ -16,7 +16,7 @@ And I use this name to hope the merits from this application will be dedicated t
   * 128bit AES Encryption
   * 256bit AES Encryption
 * Set public-key certificate protection to a pdf.
-  Supported algorithms are same as the password protection.
+  Supported algorithms are as same as the password protection.
 
 ## About signing with TSA
 
@@ -122,6 +122,7 @@ eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/downlo
 var pdfBlob = DriveApp.getFilesByName("_test.pdf").next().getBlob();
 var certBlob = DriveApp.getFilesByName("_test.pfx").next().getBlob();
 // Sign the pdf
+/** @type {SignOption} */
 var sopt = {
   p12cert: certBlob.getBytes(),
   pwd: "some passphrase",
@@ -181,7 +182,7 @@ Set password protection to the pdf.
 async function protect1(pdf, upwd, opwd){
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.AES_256,
+    mode: Zga.Crypto.Mode.RC4_40,
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     userpwd: upwd,
     ownerpwd: opwd,
@@ -201,7 +202,7 @@ Set public-key certificate protection to the pdf.
  * @param {ArrayBuffer} cert
  * @return {Promise<Blob>}
  */
-async function protect1(pdf, cert){
+async function protect2(pdf, cert){
   /** @type {EncryptOption} */
   var eopt = {
     mode: Zga.Crypto.Mode.AES_128,
@@ -227,7 +228,7 @@ Sign and set protection.
  * @param {string} opwd
  * @return {Promise<Blob>}
  */
-async function sign1(pdf, cert, pwd, opwd){
+async function signAndProtect1(pdf, cert, pwd, opwd){
   /** @type {SignOption} */
   var sopt = {
     p12cert: cert,
@@ -245,6 +246,33 @@ async function sign1(pdf, cert, pwd, opwd){
 }
 ```
 
+Sign and set protection by the same certificate.
+
+```js
+/**
+ * @param {ArrayBuffer} pdf
+ * @param {ArrayBuffer} cert
+ * @param {string} pwd
+ * @return {Promise<Blob>}
+ */
+async function signAndProtect2(pdf, cert, pwd){
+  /** @type {SignOption} */
+  var sopt = {
+    p12cert: cert,
+    pwd: pwd,
+  };
+  /** @type {EncryptOption} */
+  var eopt = {
+    mode: Zga.Crypto.Mode.AES_256,
+    permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
+    pubkeys: [],
+  };
+  var signer = new Zga.PdfSigner(sopt);
+  var u8arr = await signer.sign(pdf, eopt);
+  return new Blob([u8arr], {"type" : "application/pdf"});
+}
+```
+
 ## Detail of EncryptOption
 
 * __mode__: Zga.Crypto.Mode :point_right: The values of Zga.Crypto.Mode
@@ -252,7 +280,7 @@ async function sign1(pdf, cert, pwd, opwd){
   * RC4_128: 128bit RC4 Encryption
   * AES_128: 128bit AES Encryption
   * AES_256: 256bit AES Encryption
-* __permissions__: Array<string> :point_right: (Optional) The set of permissions you want to block
+* __permissions__: Array<string> :point_right: (Optional) The set of permissions to be blocked
   * "copy": (Only valid on public-key mode) Copy text and graphics from the document;
   * "print": Print the document;
   * "modify": Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble';
