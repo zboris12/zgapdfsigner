@@ -458,21 +458,14 @@ z.PdfCryptor = class{
 	/**
 	 * @public
 	 * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
-	 * @param {boolean=} reload
+	 * @param {PDFLib.PDFRef=} ref The unique reference will be assigned to the encryption information.
 	 * @return {Promise<PDFLib.PDFDocument>}
-	 *
-	 * If the parameter of pdf is PDFLib.PDFDocument, and some embedded contents have been added to it,
-	 * then the parameter of reload needs to be true. Because before the encryption, all changes must be applied.
-	 * And if reload is true, the return value is a new pdf document, else is pdf itself.
 	 */
-	async encryptPdf(pdf, reload){
+	async encryptPdf(pdf, ref){
 		/** @type {PDFLib.PDFDocument} */
 		var pdfdoc = await z.loadPdf(pdf);
-		if(pdfdoc === pdf && reload){
-			// Temporaryly save the pdf and reload it to apply all changes.
-			/** @type {Uint8Array} */
-			var newpdf = await pdfdoc.save({"useObjectStreams": false});
-			pdfdoc = await PDFLib.PDFDocument.load(newpdf);
+		if(pdfdoc === pdf && !ref){
+			await pdfdoc.flush();
 		}
 
 		/** @type {PDFLib.PDFContext} */
@@ -485,7 +478,13 @@ z.PdfCryptor = class{
 		 * @param {PDFLib.PDFObject} a_val
 		 */
 		var func = function(a_num, a_val){
-			if(a_val instanceof PDFLib.PDFStream){
+			if(a_val instanceof PDFLib.PDFContentStream){
+				/** @type {Uint8Array} */
+				var a_dat = a_val.contentsCache.access();
+				if(a_dat){
+					a_val.contentsCache.value = this.encryptU8arr(a_num, a_dat);
+				}
+			}else if(a_val instanceof PDFLib.PDFStream){
 				if(a_val.contents){
 					a_val.contents = this.encryptU8arr(a_num, a_val.contents);
 				}
@@ -513,7 +512,12 @@ z.PdfCryptor = class{
 			func(a_arr[0].objectNumber, a_arr[1]);
 		});
 
-		pdfcont.trailerInfo.Encrypt = pdfcont.register(trobj);
+		if(ref){
+			pdfcont.assign(ref, trobj);
+		}else{
+			ref = pdfcont.register(trobj);
+		}
+		pdfcont.trailerInfo.Encrypt = ref;
 
 		return pdfdoc;
 	}
@@ -938,13 +942,22 @@ z.PdfCryptor = class{
 				var a_envelope = seed + a_pkpermissionstr;
 				/** @type {forge_cert} */
 				var a_cert = null;
-				if(typeof a_pubkey.c == "string"){
-					/** @type {forge.asn1} */
-					var a_asn1 = forge.asn1.fromDer(a_pubkey.c);
-					a_cert = forge.pki.certificateFromAsn1(a_asn1);
-					z.fixCertAttributes(a_cert);
-				}else if(a_pubkey.c){
-					a_cert = a_pubkey.c;
+				if(a_pubkey.c){
+					if(a_pubkey.c.issuer){
+						a_cert = /** @type {forge_cert} */(a_pubkey.c);
+					}else{
+						/** @type {string} */
+						var a_cerstr = "";
+						if(typeof a_pubkey.c == "string"){
+							a_cerstr = a_pubkey.c;
+						}else{
+							a_cerstr = z.u8arrToRaw(new Uint8Array(/** @type {Array<number>|ArrayBuffer|Uint8Array} */(a_pubkey.c)));
+						}
+						/** @type {forge.asn1} */
+						var a_asn1 = forge.asn1.fromDer(a_cerstr);
+						a_cert = forge.pki.certificateFromAsn1(a_asn1);
+						z.fixCertAttributes(a_cert);
+					}
 				}else{
 					throw new Error("We need a certificate.");
 				}

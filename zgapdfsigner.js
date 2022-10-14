@@ -16,6 +16,177 @@ z.TSAURLS = {
 	"7": {url: "https://freetsa.org/tsr", len: 14500},
 };
 
+z.NewRef = class{
+	/**
+	 * @param {PDFLib.PDFRef} ref
+	 * @param {number=} num
+	 * @param {string=} nm
+	 */
+	constructor(ref, num, nm){
+		/** @private @type {number} */
+		this.oriNumber = ref.objectNumber;
+		/** @private @type {number} */
+		this.oriGeneration = ref.generationNumber;
+		/** @private @type {string} */
+		this.name = nm ? nm : "";
+		/** @private @type {number} */
+		this.newNumber = num ? num : 0;
+	}
+
+	/**
+	 * @public
+	 * @param {number} num
+	 */
+	setNewNumber(num){
+		this.newNumber = num;
+	}
+
+	/**
+	 * @public
+	 * @param {boolean=} restore
+	 */
+	changeNumber(restore){
+		if(!this.newNumber){
+			if(restore){
+				return;
+			}else{
+				throw new Error("Can NOT change number since new number is not set.");
+			}
+		}
+		/** @type {PDFLib.PDFRef} */
+		var ref = PDFLib.PDFRef.of(this.oriNumber, this.oriGeneration);
+		ref.objectNumber = restore ? this.oriNumber : this.newNumber;
+		ref.tag = ref.objectNumber + " " + this.oriGeneration + " R";
+	}
+
+	/**
+	 * @public
+	 * @return {string}
+	 */
+	toString(){
+		return this.name + " -> old:" + this.oriNumber + ", new:" + this.newNumber;
+	}
+};
+
+z.NewRefMap = class extends Map{
+
+	constructor(){
+		super();
+		/** @private @type {number} */
+		this.idx = 0;
+		/** @private @type {PDFLib.PDFContext} */
+		this.pdfcont = null;
+	}
+
+	/**
+	 * @public
+	 * @param {PDFLib.PDFDocument} pdfdoc
+	 * @param {boolean=} enc
+	 * @return {PDFLib.PDFRef} If enc is true, the return value is the unique reference reserved for encrypting information.
+	 */
+	reorderPdfRefs(pdfdoc, enc){
+		this.pdfcont = pdfdoc.context;
+		/** @type {PDFLib.PDFRef} */
+		var encref = enc ? this.pdfcont.nextRef() : null;
+
+		pdfdoc.getPages().forEach(function(/** @type {PDFLib.PDFPage} */a_pg){
+			this.addAndFindRelates(a_pg.ref, "Page");
+		}.bind(this));
+		this.addAndFindRelates(this.pdfcont.trailerInfo.Root, "Catalog");
+		if(encref){
+			this.addAndFindRelates(encref, "Encrypt");
+		}
+		this.pdfcont.enumerateIndirectObjects().forEach(function(/** @type {PdfObjEntry} */a_oety){
+			/** @type {string} */
+			var a_tag = a_oety[0].tag;
+			/** @type {z.NewRef} */
+			var a_new = this.get(a_tag);
+			if(!a_new){
+				a_new = new z.NewRef(a_oety[0], ++this.idx);
+				this.set(a_tag, a_new);
+			}
+			a_new.changeNumber();
+		}.bind(this));
+		if(encref){
+			this.get(encref.tag).changeNumber();
+		}
+		return encref;
+	}
+
+	/**
+	 * @public
+	 */
+	restoreAll(){
+		/** @type {Iterator} */
+		var es = this.entries();
+		/** @type {IIterableResult} */
+		var result = es.next();
+		while(!result.done){
+			result.value[1].changeNumber(true);
+			result = es.next();
+		}
+		this.clear();
+		this.idx = 0;
+		this.pdfcont = null;
+	}
+
+	/**
+	 * @private
+	 * @param {PDFLib.PDFRef} a_ref
+	 * @param {string=} a_nm
+	 */
+	addAndFindRelates(a_ref, a_nm){
+		if(!this.get(a_ref.tag)){
+			this.set(a_ref.tag, new z.NewRef(a_ref, ++this.idx, a_nm));
+			this.findRefs(this.pdfcont.lookup(a_ref), a_nm);
+		}
+	}
+
+	/**
+	 * @private
+	 * @param {PDFLib.PDFObject|Array|Map} a_val
+	 * @param {string=} a_nm
+	 */
+	findRefs(a_val, a_nm){
+		if(!a_val || a_nm == "/Parent"){
+			return;
+		}
+		if(a_val instanceof PDFLib.PDFRef){
+			this.addAndFindRelates(a_val, a_nm);
+			return;
+		}
+		if(a_val.array){
+			a_val = a_val.array;
+		}
+		if(Array.isArray(a_val)){
+			a_val.forEach(function(/** @type {PDFLib.PDFObject} */b_val){
+				this.findRefs(b_val, a_nm);
+			}.bind(this));
+			return;
+		}
+		if(a_val instanceof PDFLib.PDFPage){
+			a_val = a_val.node;
+		}
+		while(a_val.dict && !(a_val instanceof Map)){
+			a_val = a_val.dict;
+		}
+		if(a_val instanceof Map){
+			/** @type {Iterator} */
+			var a_es = a_val.entries();
+			/** @type {IIterableResult<PdfObjEntry>} */
+			var a_result = a_es.next();
+			while(!a_result.done){
+				this.findRefs(a_result.value[1], a_result.value[0].encodedName);
+				a_result = a_es.next();
+			}
+			return;
+		}
+	}
+};
+
+/** @type {z.NewRefMap<string, z.NewRef>} */
+z.newRefs = new z.NewRefMap();
+
 z.PdfSigner = class{
 	/**
 	 * @param {SignOption} signopt
@@ -106,7 +277,14 @@ z.PdfSigner = class{
 			}
 		}
 
-		this.addSignHolder(pdfdoc);
+		/** @type {PDFLib.PDFRef} */
+		var encref = null;
+		if(this.addSignHolder(pdfdoc)){
+			// Signature in DocMDP mode may be invalid if the definitions of references are too chaotic
+			// So we make the order of references more neet.
+			await pdfdoc.flush();
+			encref = z.newRefs.reorderPdfRefs(pdfdoc, cypopt ? true : false);
+		}
 		this.log("A signature holder has been added to the pdf.");
 
 		/** @type {forge_cert} */
@@ -132,9 +310,7 @@ z.PdfSigner = class{
 			}
 			/** @type {Zga.PdfCryptor} */
 			var cypt = new z.PdfCryptor(cypopt);
-			pdfdoc = await cypt.encryptPdf(pdfdoc, true);
-			// Because pdfdoc has been changed, so this.sigContents need to be found again.
-			this.sigContents = null;
+			await cypt.encryptPdf(pdfdoc, encref);
 			this.log("Pdf data has been encrypted.");
 		}
 
@@ -142,9 +318,6 @@ z.PdfSigner = class{
 		var ret = await this.saveAndSign(pdfdoc);
 		if(!ret){
 			this.log("Change size of signature's placeholder and retry.");
-			if(!this.sigContents){
-				this.sigContents = this.findSigContents(pdfdoc);
-			}
 			this.sigContents.value = "0".repeat(this.siglen);
 			ret = await this.saveAndSign(pdfdoc);
 		}
@@ -152,6 +325,13 @@ z.PdfSigner = class{
 			this.log("Signing pdf accomplished.");
 		}else{
 			throw new Error("Failed to sign the pdf.");
+		}
+
+		// Because PDFRefs in PDFLib are stored staticly,
+		// we need to restore all changed PDFRefs
+		// for preparing the next execution.
+		if(z.newRefs.size > 0){
+			z.newRefs.restoreAll();
 		}
 
 		return ret;
@@ -173,14 +353,23 @@ z.PdfSigner = class{
 	/**
 	 * @private
 	 * @param {PDFLib.PDFDocument} pdfdoc
+	 * @return {boolean} DocMDP mode or not.
 	 */
 	addSignHolder(pdfdoc){
-		/** @const {z.VisualSignature} */
-		const visign = new z.VisualSignature(this.opt.drawinf);
-		/** @const {PDFLib.PDFRef} */
-		const strmRef = visign.createStream(pdfdoc, this.opt.signame);
+		/** @const {number} */
+		const docMdp = (this.opt.permission >= 1 && this.opt.permission <= 3) ? this.opt.permission : 0;
+		/** @const {PDFLib.PDFContext} */
+		const pdfcont = pdfdoc.context;
+		/** @const {z.SignatureCreator} */
+		const signcrt = new z.SignatureCreator(this.opt.drawinf);
 		/** @const {PDFLib.PDFPage} */
-		const page = pdfdoc.getPages()[visign.getPageIndex()];
+		const page = pdfdoc.getPages()[signcrt.getPageIndex()];
+		/** @type {PDFLib.PDFRef} */
+		var strmRef = signcrt.createStream(pdfdoc, this.opt.signame);
+
+		if(docMdp && !strmRef){
+			strmRef = signcrt.createEmptyField(pdfcont);
+		}
 
 		/** @type {Date} */
 		var signdate = new Date();
@@ -189,7 +378,7 @@ z.PdfSigner = class{
 		}
 
 		/** @type {PDFLib.PDFArray} */
-		var bytrng = new PDFLib.PDFArray(pdfdoc.context);
+		var bytrng = new PDFLib.PDFArray(pdfcont);
 		bytrng.push(PDFLib.PDFNumber.of(0));
 		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
 		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
@@ -206,12 +395,26 @@ z.PdfSigner = class{
 			"ByteRange": bytrng,
 			"Contents": this.sigContents,
 			"M": PDFLib.PDFString.fromDate(signdate),
-			"Prop_Build": pdfdoc.context.obj({
-				"App": pdfdoc.context.obj({
+			"Prop_Build": pdfcont.obj({
+				"App": pdfcont.obj({
 					"Name": "ZgaPdfSinger",
 				}),
 			}),
 		};
+		if(docMdp){
+			/** @type {PDFLib.PDFArray} */
+			var rfrc = new PDFLib.PDFArray(pdfcont);
+			rfrc.push(pdfcont.obj({
+				"Type": "SigRef",
+				"TransformMethod": "DocMDP",
+				"TransformParams": pdfcont.obj({
+					"Type": "TransformParams",
+					"P": docMdp,
+					"V": "1.2",
+				}),
+			}));
+			signObj["Reference"] = rfrc;
+		}
 		if(this.opt.reason){
 			signObj["Reason"] = this.convToPDFString(this.opt.reason);
 		}
@@ -221,85 +424,52 @@ z.PdfSigner = class{
 		if(this.opt.contact){
 			signObj["ContactInfo"] = this.convToPDFString(this.opt.contact);
 		}
-		var signatureDictRef = pdfdoc.context.register(pdfdoc.context.obj(signObj));
+		/** @type {PDFLib.PDFRef} */
+		var signatureDictRef = pdfcont.register(pdfcont.obj(signObj));
 
 		/** @type {Object<string, *>} */
 		var widgetObj = {
 			"Type": "Annot",
 			"Subtype": "Widget",
 			"FT": "Sig",
-			"Rect": visign.getSignRect(),
+			"Rect": signcrt.getSignRect(),
 			"V": signatureDictRef,
 			"T": this.convToPDFString(this.opt.signame ? this.opt.signame : "Signature1"),
 			"F": 132,
 			"P": page.ref,
 		};
 		if(strmRef){
-			widgetObj["AP"] = pdfdoc.context.obj({
+			widgetObj["AP"] = pdfcont.obj({
 				"N": strmRef,
 			});
 		}
-		var widgetDictRef = pdfdoc.context.register(pdfdoc.context.obj(widgetObj));
+		/** @type {PDFLib.PDFRef} */
+		var widgetDictRef = pdfcont.register(pdfcont.obj(widgetObj));
 
 		// Add our signature widget to the page
-		page.node.set(PDFLib.PDFName.of("Annots"), pdfdoc.context.obj([widgetDictRef]));
+		page.node.set(PDFLib.PDFName.of("Annots"), pdfcont.obj([widgetDictRef]));
 
 		// Create an AcroForm object containing our signature widget
 		pdfdoc.catalog.set(
 			PDFLib.PDFName.of("AcroForm"),
-			pdfdoc.context.obj({
+			pdfcont.obj({
 				"SigFlags": 3,
 				"Fields": [widgetDictRef],
 			}),
 		);
-	}
+		if(docMdp){
+			pdfdoc.catalog.set(
+				PDFLib.PDFName.of("Perms"),
+				pdfcont.obj({
+					"DocMDP": signatureDictRef,
+				}),
+			);
+			return true;
 
-	/**
-	 * @private
-	 * @param {PDFLib.PDFDocument} pdfdoc
-	 * @return {PDFLib.PDFHexString}
-	 */
-	findSigContents(pdfdoc){
-		/** @type {boolean} */
-		var istgt = false;
-		/** @type {PDFLib.PDFHexString} */
-		var sigContents = null;
-		/** @type {Array<PdfObjEntry>} */
-		var objarr = pdfdoc.context.enumerateIndirectObjects();
-		for(var i=objarr.length - 1; i>= 0; i--){
-			if(objarr[i][1].dict instanceof Map){
-				/** @type {Iterator<PdfObjEntry>} */
-				var es = objarr[i][1].dict.entries();
-				/** @type {IIterableResult<PdfObjEntry>} */
-				var res = es.next();
-				istgt = false;
-				sigContents = null;
-				while(!res.done){
-					if(res.value[0].encodedName == "/ByteRange"){
-						if(res.value[1].array &&
-							res.value[1].array.length == 4 &&
-							res.value[1].array[0].numberValue == 0 &&
-							res.value[1].array[1].encodedName == "/" + this.DEFAULT_BYTE_RANGE_PLACEHOLDER &&
-							res.value[1].array[2].encodedName == res.value[1].array[1].encodedName &&
-							res.value[1].array[3].encodedName == res.value[1].array[1].encodedName){
-							istgt = true;
-						}
-					}else if(res.value[0].encodedName == "/Contents"){
-						if(res.value[1] instanceof PDFLib.PDFHexString){
-							sigContents = res.value[1];
-						}
-					}
-					if(istgt && sigContents){
-						return sigContents;
-					}else{
-						res = es.next();
-					}
-				}
-			}
+		}else{
+			return false;
 		}
-		return null;
 	}
-
 
 	/**
 	 * @private
@@ -431,23 +601,13 @@ z.PdfSigner = class{
 			],
 		});
 
-		if(this.tsainf){
-			//p7.signers[0].unauthenticatedAttributes.push({type: forge.pki.oids.timeStampToken, value: ""}) 
-			p7.signers[0].unauthenticatedAttributes.push({type: "1.2.840.113549.1.9.16.2.14", value: ""});
-		}
-
 		// Sign in detached mode.
 		p7.sign({"detached": true});
 
 		if(this.tsainf){
 			/** @type {forge.asn1} */
 			var tsatoken = this.queryTsa(p7.signers[0].signature);
-			p7.signerInfos[0].value[6].value[0].value[1] = forge.asn1.create(
-				forge.asn1.Class.UNIVERSAL,
-				forge.asn1.Type.SET,
-				true,
-				[tsatoken]
-			);
+			p7.signerInfos[0].value.push(tsatoken);
 			this.log("Timestamp from " + this.tsainf.url + " has been added to the signature.");
 		}
 
@@ -571,6 +731,8 @@ z.PdfSigner = class{
 	 * @return {forge.asn1}
 	 */
 	queryTsa(signature){
+		/** @lends {forge.asn1} */
+		var asn1 = forge.asn1;
 		/** @type {string} */
 		var tsr = this.genTsrData(signature);
 		/** @type {Uint8Array} */
@@ -586,8 +748,19 @@ z.PdfSigner = class{
 		/** @type {string} */
 		var tstr = z.u8arrToRaw(new Uint8Array(tblob.getBytes()));
 		/** @type {forge.asn1} */
-		var token = forge.asn1.fromDer(tstr).value[1];
-		return token;
+		var token = asn1.fromDer(tstr).value[1];
+
+		// create the asn1 to append to the signature
+		/** @type {string} *///forge.pki.oids.timeStampToken
+		var typstr = asn1.oidToDer("1.2.840.113549.1.9.16.2.14").getBytes();
+		return asn1.create(asn1.Class.CONTEXT_SPECIFIC, 1, true, [
+			asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
+				// Attribute Type
+				asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, typstr),
+				// Attribute Value
+				asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [token]),
+			]),
+		]);
 	}
 
 	/**
@@ -601,7 +774,7 @@ z.PdfSigner = class{
 	}
 };
 
-z.VisualSignature = class{
+z.SignatureCreator = class{
 	/**
 	 * @param {SignDrawInfo=} drawinf
 	 */
@@ -635,6 +808,20 @@ z.VisualSignature = class{
 	 */
 	getSignRect(){
 		return this.rect;
+	}
+
+	/**
+	 * @public
+	 * @param {PDFLib.PDFContext} pdfcont
+	 * @return {PDFLib.PDFRef}
+	 */
+	createEmptyField(pdfcont){
+		return pdfcont.register(pdfcont.obj({
+			"Type": "XObject",
+			"Subtype": "Form",
+			"FormType": 1,
+			"BBox": [0, 0, 0, 0],
+		}));
 	}
 
 	/**
@@ -711,7 +898,7 @@ z.VisualSignature = class{
 			"Resources": rscObj,
 		});
 		/** @type {PDFLib.PDFContentStream} */
-		var strm = PDFLib.PDFContentStream.of(frmDict, sigOprs, false);
+		var strm = PDFLib.PDFContentStream.of(frmDict, sigOprs, true);
 		return pdfdoc.context.register(strm);
 	}
 

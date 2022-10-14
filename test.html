@@ -4,22 +4,34 @@
 <meta http-equiv="content-type" content="text/html; charset=UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title> Test for ZgaPdfSigner </title>
-<script src="https://unpkg.com/node-forge/dist/forge.min.js" type="text/javascript"></script>
-<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js" type="text/javascript"></script>
-<script src="zgapdfsigner.js" type="text/javascript"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/node-forge@1.3.1/dist/forge.min.js" type="text/javascript"></script>
+<script src="dist/zgapdfsigner.min.js" type="text/javascript"></script>
 <script type="text/javascript">
-function test(){
-	var img = document.getElementById("img").files[0];
-	if(img){
-		readAsArrayBuffer(img, function(a_buff){
-			testSign(a_buff, getFilExt(img));
-		});
-	}else{
-		testSign();
-	}
+/**
+ * @param {string} fid
+ * @return {Promise<ArrayBuffer>}
+ */
+function readFile(fid){
+	return new Promise((resolve, reject) => {
+		var f = document.getElementById(fid).files[0];
+		if(f){
+			var reader = new FileReader();
+			reader.onload = function(a_evt){
+				resolve(a_evt.target.result);
+			};
+			reader.readAsArrayBuffer(f);
+		}else{
+			resolve(null);
+		}
+	});
 }
-function getFilExt(f){
-	var n = f.name;
+/**
+ * @param {string} fid
+ * @return {string}
+ */
+function getFilExt(fid){
+	var n = document.getElementById(fid).files[0].name;
 	var i = n.lastIndexOf(".");
 	if(i >= 0){
 		return n.slice(i + 1);
@@ -27,50 +39,189 @@ function getFilExt(f){
 		return null;
 	}
 }
-function readAsArrayBuffer(f, func){
-	var reader = new FileReader();
-	reader.onload = function(a_evt){
-		func(a_evt.target.result);
-	};
-	reader.readAsArrayBuffer(f);
-}
-function testSign(imgdat, imgtyp){
-	var fil = document.getElementById("fff").files[0];
-	var kf = document.getElementById("kkk").files[0];
-	readAsArrayBuffer(fil, function(a_pdf){
-		readAsArrayBuffer(kf, async function(b_kfbuf){
-			var b_opt = {
-				p12cert: b_kfbuf,
-				pwd: document.getElementById("pwd").value,
+async function testMe(){
+	/** @type {ArrayBuffer} */
+	var pdf = await readFile("fff");
+	if(!pdf){
+		alert("The target pdf is not specified.");
+		return;
+	}
+
+	/** @type {ArrayBuffer} */
+	var pfx = await readFile("kkk");
+	/** @type {string} */
+	var ps = document.getElementById("pwd").value;
+	if(pfx && !ps){
+		alert("The passphrase is not specified.");
+		return;
+	}
+
+	/** @type {ArrayBuffer} */
+	var img = await readFile("img");
+	/** @type {string} */
+	var imgType = "";
+	if(img){
+		imgType = getFilExt("img");
+	}
+
+	/** @type {ArrayBuffer} */
+	var pubcert = await readFile("pubcert");
+	/** @type {string} */
+	var upwd = document.getElementById("upwd").value;
+
+	/** @type {SignOption} */
+	var sopt = null;
+	if(pfx){
+		sopt = {
+			p12cert: pfx,
+			pwd: ps,
+			permission: parseInt(document.getElementById("sperm").value),
+			reason: document.getElementById("tReason").value,
+			location: document.getElementById("tLocation").value,
+			contact: document.getElementById("tContact").value,
+			debug: true,
+		};
+		if(img){
+			sopt.drawinf = {
+				area: {
+					x: 25, // left
+					y: 150, // top
+					w: 60,
+					h: 60,
+				},
+//				pageidx: 2,
+				imgData: img,
+				imgType: imgType,
 			};
-			if(imgdat){
-				b_opt.drawinf = {
-					area: {
-						x: 25, // left
-						y: 150, // top
-						w: 60,
-						h: 60,
-					},
-					imgData: imgdat,
-					imgType: imgtyp,
-				};
+		}
+	}
+
+	/** @type {EncryptOption} */
+	var eopt = undefined;
+	if(pubcert || upwd){
+		eopt = {
+			mode: parseInt(document.getElementById("mode").value),
+			permissions: [],
+		};
+		Array.from(document.getElementsByName("perms")).forEach((a_chk) => {
+			if(!a_chk.checked){
+				eopt.permissions.push(a_chk.value);
 			}
-			var b_signer = new Zga.PdfSigner(b_opt);
-			var b_u8s = await b_signer.sign(a_pdf);
-			document.getElementById("download").download = "zzzs3.pdf";
-			document.getElementById("download").href = window.URL.createObjectURL(new Blob([b_u8s], {"type" : "application/pdf"}));
-			document.getElementById("download").click();
 		});
+		if(pubcert){
+			eopt.pubkeys = [{
+				c: pubcert,
+			}];
+		}else if(upwd){
+			eopt.userpwd = upwd;
+		}
+	}
+
+	/** @type {Uint8Array} */
+	var u8dat = null;
+	if(sopt){
+		/** @type {Zga.PdfSigner} */
+		var ser = new Zga.PdfSigner(sopt);
+		u8dat = await ser.sign(pdf, eopt);
+	}else if(eopt){
+		/** @type {Zga.PdfCryptor} */
+		var crypr = new Zga.PdfCryptor(eopt);
+		/** @type {PDFLib.PDFDocument} */
+		var pdfdoc = await crypr.encryptPdf(pdf);
+		u8dat = await pdfdoc.save({"useObjectStreams": false});
+	}else{
+		alert("Nothing to do.");
+		return;
+	}
+
+	document.getElementById("download").download = "test_test.pdf";
+	document.getElementById("download").href = window.URL.createObjectURL(new Blob([u8dat], {"type" : "application/pdf"}));
+	document.getElementById("download").click();
+}
+function test(){
+	testMe().catch((err) => {
+		console.error(err);
+		alert(err.message);
 	});
 }
+function clearFiles(){
+	["fff","kkk","img","pubcert"].forEach((a_id) => {
+		document.getElementById(a_id).value = "";
+	});
+}
+function changeSperm(){
+	/** @type {Element} */
+	var sel = window.event.currentTarget || window.event.srcElement || window.event.target;
+	/** @type {Element} */
+	var spn = document.getElementById("spcmt");
+	switch(sel.value){
+	case "1":
+		spn.innerText = "No changes to the document are permitted; any change to the document invalidates the signature.";
+		break;
+	case "2":
+		spn.innerText = "Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.";
+		break;
+	case "3":
+		spn.innerText = "Permitted changes are the same as for 2, as well as annotation creation, deletion, and modification; other changes invalidate the signature.";
+		break;
+	default:
+		spn.innerText = "";
+		break;
+	}
+}
 </script>
+<style>
+body {
+	line-height: 1.5em;
+}
+span.header {
+	font-weight: bold;
+	color: blue;
+}
+</style>
 </head>
 <body>
 <label>pdf </label><input type="file" id="fff" /><br />
+<hr />
+<span class="header">Sign the PDF:</span><br />
 <label>certificate </label><input type="file" id="kkk" /><br />
 <label>passphrase </label><input type="password" id="pwd" /><br />
 <label>signature image </label><input type="file" id="img" /><br />
-<a id="download" href="#" download="" style="display: none;" target="_blank">dummy</a>
+<label>permission </label>
+<select id="sperm" onchange="changeSperm()">
+<option value="0">No DocMDP</option>
+<option value="1">DocMDP pattern 1</option>
+<option value="2">DocMDP pattern 2</option>
+<option value="3">DocMDP pattern 3</option>
+</select>
+<span id="spcmt"></span><br />
+<label>reason </label><input type="text" id="tReason" value="I have a test reason." /><br />
+<label>location </label><input type="text" id="tLocation" value="I am on the earth." /><br />
+<label>contact </label><input type="text" id="tContact" value="zga@zga.com" /><br />
+<hr />
+<span class="header">Encrypt the PDF:</span><br />
+<label>encryption </label>
+<select id="mode">
+<option value="0">RC4-40</option>
+<option value="1">RC4-128</option>
+<option value="2">AES-128</option>
+<option value="3">AES-256</option>
+</select><br />
+<label>user password </label><input type="password" id="upwd" /><br />
+<label>public certificate </label><input type="file" id="pubcert" /><br />
+<label>permissions: </label><br />
+<input type="checkbox" id="pCopy" name="perms" value="copy" checked><label for="pCopy">"copy": Copy text and graphics from the document. (Only valid on public-key mode)</label><br />
+<input type="checkbox" id="pPrint" name="perms" value="print" checked><label for="pPrint">"print": Print the document.</label><br />
+<input type="checkbox" id="pModify" name="perms" value="modify" checked><label for="pModify">"modify": Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble'.</label><br />
+<input type="checkbox" id="pCopyExtract" name="perms" value="copy-extract" checked><label for="pCopyExtract">"copy-extract": Copy or otherwise extract text and graphics from the document.</label><br />
+<input type="checkbox" id="pAnnotForms" name="perms" value="annot-forms" checked><label for="pAnnotForms">"annot-forms": Add or modify text annotations, fill in interactive form fields, and, if 'modify' is also set, create or modify interactive form fields (including signature fields).</label><br />
+<input type="checkbox" id="pFillForms" name="perms" value="fill-forms" checked><label for="pFillForms">"fill-forms": Fill in existing interactive form fields (including signature fields), even if 'annot-forms' is not specified.</label><br />
+<input type="checkbox" id="pExtract" name="perms" value="extract" checked><label for="pExtract">"extract": Extract text and graphics (in support of accessibility to users with disabilities or for other purposes).</label><br />
+<input type="checkbox" id="pAssemble" name="perms" value="assemble" checked><label for="pAssemble">"assemble": Assemble the document (insert, rotate, or delete pages and create bookmarks or thumbnail images), even if 'modify' is not set.</label><br />
+<input type="checkbox" id="pPrintHigh" name="perms" value="print-high" checked><label for="pPrintHigh">"print-high": Print the document to a representation from which a faithful digital copy of the PDF content could be generated. When this is not set, printing is limited to a low-level representation of the appearance, possibly of degraded quality.</label><br />
+<hr />
 <input type="button" value="test" onclick="test()" />
+<input type="button" value="clear files" onclick="clearFiles()" />
+<a id="download" href="#" download="" style="display: none;" target="_blank">dummy</a>
 </body>
 </html>

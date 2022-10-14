@@ -9,6 +9,7 @@ And I use this name to hope the merits from this application will be dedicated t
 
 * Sign a pdf with an invisible pkcs#7 signature.
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
+* Sign a pdf and set DocMDP(document modification detection and prevention).
 * Sign a pdf with a timestamp from TSA(Time Stamp Authority). (Only in Google Apps Script)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
@@ -22,8 +23,6 @@ And I use this name to hope the merits from this application will be dedicated t
 
 Because of the CORS security restrictions in web browser,
 signing with a timestamp from TSA can only be used in Google Apps Script.
-And because [node-forge](https://github.com/digitalbazaar/forge) hasn't supported unauthenticated attributes in pkcs#7 yet,
-so when use this function, [the edited version](https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/forge.min.edited.js) needs to be imported.
 
 ## The Dependencies
 
@@ -34,9 +33,9 @@ so when use this function, [the edited version](https://github.com/zboris12/zgap
 
 Just import the dependencies and this tool.
 ```html
-<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js" type="text/javascript"></script>
-<script src="https://unpkg.com/node-forge/dist/forge.min.js" type="text/javascript"></script>
-<script src="https://github.com/zboris12/zgapdfsigner/releases/download/2.0.0/zgapdfsigner.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/node-forge@1.3.1/dist/forge.min.js" type="text/javascript"></script>
+<script src="https://github.com/zboris12/zgapdfsigner/releases/download/2.2.0/zgapdfsigner.min.js" type="text/javascript"></script>
 ```
 
 ## Let's sign
@@ -55,6 +54,7 @@ async function sign1(pdf, cert, pwd){
   var sopt = {
     p12cert: cert,
     pwd: pwd,
+    permission: 1,
   };
   var signer = new Zga.PdfSigner(sopt);
   var u8arr = await signer.sign(pdf);
@@ -114,9 +114,9 @@ var window = globalThis;
 // Load pdf-lib
 eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").getContentText());
 // Load node-forge
-eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/1.2.0/forge.min.edited.js").getContentText());
+eval(UrlFetchApp.fetch("https://unpkg.com/node-forge@1.3.1/dist/forge.min.js").getContentText());
 // Load ZgaPdfSigner
-eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/2.0.0/zgapdfsigner.min.js").getContentText());
+eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/2.2.0/zgapdfsigner.min.js").getContentText());
 
 // Load pdf, certificate
 var pdfBlob = DriveApp.getFilesByName("_test.pdf").next().getBlob();
@@ -137,14 +137,19 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
 
 ## Detail of SignOption
 
-* __p12cert__:  Array<number>|Uint8Array|ArrayBuffer|string :point_right: Certificate's data
-* __pwd__:      string :point_right: The passphrase of the certificate
-* __reason__:   string :point_right: (Optional) The reason for signing
+* __p12cert__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: Certificate's data
+* __pwd__: string :point_right: The passphrase of the certificate
+* __permission__: number :point_right: (Optional) The modification permissions granted for this document.
+  This is a setting of DocMDP(document modification detection and prevention). Valid values are:
+  * 1: No changes to the document are permitted; any change to the document invalidates the signature.
+  * 2: Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.
+  * 3: Permitted changes are the same as for 2, as well as annotation creation, deletion, and modification; other changes invalidate the signature.
+* __reason__: string :point_right: (Optional) The reason for signing
 * __location__: string :point_right: (Optional) Your location
-* __contact__:  string :point_right: (Optional) Your contact information
+* __contact__: string :point_right: (Optional) Your contact information
 * __signdate__: Date|string|_TsaServiceInfo_ :point_right: (Optional)
-  * When it is a Date, it means the date and time for signing.
-  * When it is a string, it can be an url of TSA or an index of the preset TSA as below:
+  * When it is a Date, it means the date and time of signing.
+  * When it is a string, it can be an url of TSA or an index of the preset TSAs as below:
     * "1": http://ts.ssl.com
     * "2": http://timestamp.digicert.com
     * "3": http://timestamp.sectigo.com
@@ -152,20 +157,21 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
     * "5": http://timestamp.apple.com/ts01
     * "6": http://www.langedge.jp/tsa
     * "7": https://freetsa.org/tsr
-  * When it is a _TsaServiceInfo_, it means a full customized information of TSA.
+  * When it is a _TsaServiceInfo_, it means a full customized information of a TSA.
     * __url__: string :point_right: The url of TSA
     * __len__: number :point_right: (Optional) The length of signature's placeholder
+  * When it is omitted, the system timestamp will be used.
 * __signame__: string :point_right: (Optional) The name of the signature
 * __drawinf__: _SignDrawInfo_ :point_right: (Optional) Visible signature's information
-  * __area__: _SignAreaInfo_ :point_right: The signature's drawing area
+  * __area__: _SignAreaInfo_ :point_right: The signature's drawing area, these numbers are dots on 72dpi.
     * __x__: number :point_right: Distance from left
     * __y__: number :point_right: Distance from top
     * __w__: number :point_right: Width
     * __h__: number :point_right: Height
-  * __pageidx__: number :point_right: (Optional) The page index for drawing the signature
+  * __pageidx__: number :point_right: (Optional) The index of a page where the signature will be drawn.
   * __imgData__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The image's data
   * __imgType__: string :point_right: (Optional) The image's type, <ins>only support jpg and png</ins>
-  * __text__: string :point_right: (Optional) A text drawing on signature, <ins>not implemented yet</ins>
+  * __text__: string :point_right: (Optional) A text drawing for the signature, <ins>not implemented yet</ins>
   * __fontData__: PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The font's data for drawing text, <ins>not implemented yet</ins>
 
 ## Let's protect the pdf
@@ -293,8 +299,8 @@ async function signAndProtect2(pdf, cert, pwd){
 * __userpwd__: string :point_right: (Optional) User password. Used when opening the pdf.
 * __ownerpwd__: string :point_right: (Optional) Owner password. If not specified, a random value is used.
 * __pubkeys__: Array<_PubKeyInfo_> :point_right: (Optional) Array of recipients containing public-key certificates ('c') and permissions ('p').
-  * __c__: string|forge_cert :point_right: (Optional) A public-key certificate.
-           Only if you want to encrypt the pdf by the certificate for signing, the c can be omitted.
+  * __c__: Array<number>|Uint8Array|ArrayBuffer|string|forge_cert :point_right: (Optional) A public-key certificate.
+           Only when you want to encrypt the pdf by the certificate used in signing, the c can be omitted.
   * __p__: Array<string> :point_right: (Optional) Permissions
 
 ## Thanks

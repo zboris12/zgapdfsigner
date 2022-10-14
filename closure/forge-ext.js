@@ -118,13 +118,15 @@ forge.asn1.Type.NULL;
 /** @type {number} */
 forge.asn1.Type.OCTETSTRING;
 forge.asn1.Class = {};
-/** @type {string} */
+/** @type {number} */
 forge.asn1.Class.UNIVERSAL;
+/** @type {number} */
+forge.asn1.Class.CONTEXT_SPECIFIC;
 /**
- * @param {string} tagClass
+ * @param {number} tagClass
  * @param {number} type
  * @param {boolean} constructed
- * @param {Array<string>} value
+ * @param {Array<string>|string} value
  * @param {Object=} options
  * @return {forge.asn1}
  */

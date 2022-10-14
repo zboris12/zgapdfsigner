@@ -47,6 +47,10 @@ PDFLib.PDFDocument.prototype.embedPng = function(png){};
  * @returns {Promise<PDFLib.PDFImage>}
  */
 PDFLib.PDFDocument.prototype.embedJpg = function(jpg){};
+/**
+ * @returns {Promise<number>}
+ */
+PDFLib.PDFDocument.prototype.flush = function(){};
 /** @type {PDFLib.PDFCatalog} */
 PDFLib.PDFDocument.prototype.catalog;
 /** @type {PDFLib.PDFContext} */
@@ -95,6 +99,14 @@ PDFLib.PDFPageLeaf.prototype.set = function(name, object){};
 PDFLib.PDFRef = function(){};
 /** @type {number} */
 PDFLib.PDFRef.prototype.objectNumber;
+/** @type {number} */
+PDFLib.PDFRef.prototype.generationNumber;
+/**
+ * @param {number} objectNumber
+ * @param {number=} generationNumber
+ * @return {PDFLib.PDFRef}
+ */
+PDFLib.PDFRef.of = function(objectNumber, generationNumber){};
 
 /** @constructor */
 PDFLib.PDFContext = function(){};
@@ -108,18 +120,40 @@ PDFLib.PDFContext = function(){};
 var PdfObjEntry;
 /** @return {Array<PdfObjEntry>} */
 PDFLib.PDFContext.prototype.enumerateIndirectObjects = function(){};
-/** @type {Object<string, *>} */
+/**
+ * @typedef
+ * {{
+ *    Root: PDFLib.PDFRef,
+ *    ID: (PDFLib.PDFArray|undefined),
+ * }}
+ */
+var PdfTrailerInfo;
+/** @type {PdfTrailerInfo} */
 PDFLib.PDFContext.prototype.trailerInfo;
+/**
+ * @param {PDFLib.PDFRef} ref
+ * @param {PDFLib.PDFObject} object
+ */
+PDFLib.PDFContext.prototype.assign = function(ref, object){};
 /**
  * @param {PDFLib.PDFObject} object
  * @return {PDFLib.PDFRef}
  */
 PDFLib.PDFContext.prototype.register = function(object){};
 /**
+ * @return {PDFLib.PDFRef}
+ */
+PDFLib.PDFContext.prototype.nextRef = function(){};
+/**
  * @param {*} literal
  * @return {PDFLib.PDFObject}
  */
 PDFLib.PDFContext.prototype.obj = function(literal){};
+/**
+ * @param {PDFLib.PDFRef} ref
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFContext.prototype.lookup = function(ref){};
 
 /** @constructor */
 PDFLib.PDFObject = function(){};
@@ -152,6 +186,11 @@ PDFLib.PDFArray = function(context){};
  * @param {PDFLib.PDFObject} object
  */
 PDFLib.PDFArray.prototype.push = function(object){};
+/**
+ * @param {number} idx
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFArray.prototype.get = function(idx){};
 
 /**
  * @constructor
@@ -253,7 +292,29 @@ PDFLib.drawImage = function(name, options){};
 
 /**
  * @constructor
+ */
+PDFLib.Cache = function(){};
+/**
+ * @return {Uint8Array}
+ */
+PDFLib.Cache.prototype.access = function(){};
+/** @type {Uint8Array} */
+PDFLib.Cache.prototype.value;
+/**
+ * @constructor
  * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFStream = function(){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFStream}
+ */
+PDFLib.PDFFlateStream = function(){};
+/** @type {PDFLib.Cache} */
+PDFLib.PDFFlateStream.prototype.contentsCache;
+/**
+ * @constructor
+ * @extends {PDFLib.PDFFlateStream}
  */
 PDFLib.PDFContentStream = function(){};
 /**

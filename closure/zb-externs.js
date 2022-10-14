@@ -32,10 +32,16 @@ var SignAreaInfo;
  */
 var SignDrawInfo;
 /**
+ * permission: (DocMDP) The modification permissions granted for this document. Valid values are:
+ *  1 : No changes to the document are permitted; any change to the document invalidates the signature.
+ *  2 : Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.
+ *  3 : Permitted changes are the same as for 2, as well as annotation creation, deletion, and modification; other changes invalidate the signature.
+ *
  * @typedef
  * {{
  *    p12cert: (Array<number>|Uint8Array|ArrayBuffer|string),
  *    pwd: string,
+ *    permission: (number|undefined),
  *    reason: (string|undefined),
  *    location: (string|undefined),
  *    contact: (string|undefined),
@@ -50,7 +56,7 @@ var SignOption;
 /**
  * @typedef
  * {{
- *    c: (string|forge_cert|undefined),
+ *    c: (Array<number>|Uint8Array|ArrayBuffer|string|forge_cert|undefined),
  *    p: (Array<string>|undefined),
  * }}
  */
@@ -103,6 +109,17 @@ var CFType;
 var RC4LastInfo;
 
 var Zga = {};
+/**
+ * @param {Uint8Array} uarr
+ * @return {string}
+ */
+Zga.u8arrToRaw = function(uarr){};
+/**
+ * @param {string} raw
+ * @return {Uint8Array}
+ */
+Zga.rawToU8arr = function(raw){};
+
 Zga.Crypto = {};
 /** @enum {number} */
 Zga.Crypto.Mode = {
@@ -118,8 +135,19 @@ Zga.Crypto.Mode = {
 Zga.PdfCryptor = function(encopt){};
 /**
  * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
- * @param {boolean=} reload
+ * @param {PDFLib.PDFRef=} ref
  * @return {Promise<PDFLib.PDFDocument>}
  */
-Zga.PdfCryptor.prototype.encryptPdf = function(pdf, reload){};
-
+Zga.PdfCryptor.prototype.encryptPdf = function(pdf, ref){};
+/**
+ * @constructor
+ * @param {SignOption} signopt
+ */
+Zga.PdfSigner = function(signopt){};
+/**
+ * @public
+ * @param {PDFLib.PDFDocument|Array<number>|Uint8Array|ArrayBuffer|string} pdf
+ * @param {EncryptOption=} cypopt
+ * @return {Promise<Uint8Array>}
+ */
+Zga.PdfSigner.prototype.sign = function(pdf, cypopt){};
