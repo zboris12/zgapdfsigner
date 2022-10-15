@@ -105,11 +105,8 @@ z.NewRefMap = class extends Map{
 				a_new = new z.NewRef(a_oety[0], ++this.idx);
 				this.set(a_tag, a_new);
 			}
-			a_new.changeNumber();
 		}.bind(this));
-		if(encref){
-			this.get(encref.tag).changeNumber();
-		}
+		this.changeAll();
 		return encref;
 	}
 
@@ -117,14 +114,7 @@ z.NewRefMap = class extends Map{
 	 * @public
 	 */
 	restoreAll(){
-		/** @type {Iterator} */
-		var es = this.entries();
-		/** @type {IIterableResult} */
-		var result = es.next();
-		while(!result.done){
-			result.value[1].changeNumber(true);
-			result = es.next();
-		}
+		this.changeAll(true);
 		this.clear();
 		this.idx = 0;
 		this.pdfcont = null;
@@ -182,6 +172,22 @@ z.NewRefMap = class extends Map{
 			return;
 		}
 	}
+
+	/**
+	 * @private
+	 * @param {boolean=} restore
+	 */
+	changeAll(restore){
+		/** @type {Iterator} */
+		var es = this.entries();
+		/** @type {IIterableResult} */
+		var result = es.next();
+		while(!result.done){
+			result.value[1].changeNumber(restore);
+			result = es.next();
+		}
+	}
+
 };
 
 /** @type {z.NewRefMap<string, z.NewRef>} */
