@@ -11,6 +11,19 @@ var PdfLoadOptions;
 /** @const */
 var PDFLib = {};
 
+/**
+ * @param {string} str
+ * @param {Array<number>} buffer
+ * @param {number} offset
+ * @return {number}
+ */
+PDFLib.copyStringIntoBuffer = function(str, buffer, offset){};
+/**
+ * @param {string|ArrayBuffer|Uint8Array} input
+ * @return {Uint8Array}
+ */
+PDFLib.toUint8Array = function(input){};
+
 /** @constructor */
 PDFLib.PDFDocument = function(){};
 /**
@@ -57,12 +70,59 @@ PDFLib.PDFDocument.prototype.catalog;
 PDFLib.PDFDocument.prototype.context;
 
 /** @constructor */
+PDFLib.PDFAcroField = function(){};
+/**
+ * @returns {PDFLib.PDFString|PDFLib.PDFHexString}
+ */
+PDFLib.PDFAcroField.prototype.T = function(){};
+
+/**
+ * @constructor
+ * @extends {PDFLib.PDFAcroField}
+ */
+PDFLib.PDFAcroTerminal = function(){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFAcroTerminal}
+ */
+PDFLib.PDFAcroSignature = function(){};
+
+/** @constructor */
+PDFLib.PDFAcroForm = function(){};
+/**
+ * @typedef
+ * {{
+ *    0: PDFLib.PDFAcroField,
+ *    1: PDFLib.PDFRef,
+ * }}
+ */
+var PdfFieldInfo;
+/**
+ * @return {Array<PdfFieldInfo>}
+ */
+PDFLib.PDFAcroForm.prototype.getAllFields = function(){};
+/**
+ * @param {PDFLib.PDFRef} field
+ */
+PDFLib.PDFAcroForm.prototype.addField = function(field){};
+/** @type {PDFLib.PDFDict} */
+PDFLib.PDFAcroForm.prototype.dict;
+
+/** @constructor */
 PDFLib.PDFCatalog = function(){};
 /**
  * @param {PDFLib.PDFName} name
  * @param {PDFLib.PDFObject} object
  */
 PDFLib.PDFCatalog.prototype.set = function(name, object){};
+/**
+ * @return {PDFLib.PDFDict}
+ */
+PDFLib.PDFCatalog.prototype.AcroForm = function(){};
+/**
+ * @return {PDFLib.PDFAcroForm}
+ */
+PDFLib.PDFCatalog.prototype.getOrCreateAcroForm = function(){};
 
 /** @constructor */
 PDFLib.PDFPage = function(){};
@@ -87,15 +147,25 @@ var PdfSize;
  */
 PDFLib.PDFPage.prototype.getSize = function(){};
 
-/** @constructor */
+/**
+ * @constructor
+ * @extends {PDFLib.PDFDict}
+ */
 PDFLib.PDFPageLeaf = function(){};
 /**
  * @param {PDFLib.PDFName} name
  * @param {PDFLib.PDFObject} object
  */
 PDFLib.PDFPageLeaf.prototype.set = function(name, object){};
+/**
+ * @return {PDFLib.PDFArray}
+ */
+PDFLib.PDFPageLeaf.prototype.Annots = function(){};
 
-/** @constructor */
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
 PDFLib.PDFRef = function(){};
 /** @type {number} */
 PDFLib.PDFRef.prototype.objectNumber;
@@ -108,7 +178,9 @@ PDFLib.PDFRef.prototype.generationNumber;
  */
 PDFLib.PDFRef.of = function(objectNumber, generationNumber){};
 
-/** @constructor */
+/**
+ * @constructor
+ */
 PDFLib.PDFContext = function(){};
 /**
  * @typedef
@@ -154,6 +226,12 @@ PDFLib.PDFContext.prototype.obj = function(literal){};
  * @return {PDFLib.PDFObject}
  */
 PDFLib.PDFContext.prototype.lookup = function(ref){};
+/**
+ * @param {PDFLib.PDFRef} ref
+ * @param {*} typ
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFContext.prototype.lookupMaybe = function(ref, typ){};
 
 /** @constructor */
 PDFLib.PDFObject = function(){};
@@ -161,12 +239,20 @@ PDFLib.PDFObject = function(){};
 PDFLib.PDFObject.prototype.dict;
 /** @type {Array<PDFLib.PDFName>} */
 PDFLib.PDFObject.prototype.array;
+/**
+ * @param {Array<number>} _buffer
+ * @param {number} _offset
+ * @return {number}
+ */
+PDFLib.PDFObject.prototype.copyBytesInto = function(_buffer, _offset){};
 
 /**
  * @constructor
  * @extends {PDFLib.PDFObject}
  */
 PDFLib.PDFName = function(){};
+/** @type {PDFLib.PDFName} */
+PDFLib.PDFName.Annots;
 /**
  * @param {string} value
  * @return {PDFLib.PDFName}
@@ -176,9 +262,12 @@ PDFLib.PDFName.of = function(value){};
 PDFLib.PDFName.prototype.encodedName;
 /** @type {number} */
 PDFLib.PDFName.prototype.numberValue;
+/** @return {string} */
+PDFLib.PDFName.prototype.value = function(){};
 
 /**
  * @constructor
+ * @extends {PDFLib.PDFObject}
  * @param {PDFLib.PDFContext} context
  */
 PDFLib.PDFArray = function(context){};
@@ -191,6 +280,10 @@ PDFLib.PDFArray.prototype.push = function(object){};
  * @return {PDFLib.PDFObject}
  */
 PDFLib.PDFArray.prototype.get = function(idx){};
+/**
+ * @return {Array<PDFLib.PDFObject>}
+ */
+PDFLib.PDFArray.prototype.asArray = function(){};
 
 /**
  * @constructor
@@ -207,6 +300,10 @@ PDFLib.PDFString.of = function(value){};
  * @return {PDFLib.PDFString}
  */
 PDFLib.PDFString.fromDate = function(value){};
+/**
+ * @return {string}
+ */
+PDFLib.PDFString.prototype.asString = function(){};
 
 /**
  * @constructor
@@ -223,6 +320,10 @@ PDFLib.PDFHexString.of = function(value){};
  * @return {PDFLib.PDFHexString}
  */
 PDFLib.PDFHexString.fromText = function(value){};
+/**
+ * @return {string}
+ */
+PDFLib.PDFHexString.prototype.decodeText = function(){};
 
 /**
  * @constructor
@@ -318,9 +419,81 @@ PDFLib.PDFFlateStream.prototype.contentsCache;
  */
 PDFLib.PDFContentStream = function(){};
 /**
- * @param {PDFLib.PDFObject} dict
+ * @param {PDFLib.PDFDict} dict
  * @param {Array<PDFLib.PDFOperator>} operators
  * @param {boolean=} encode
  * @return {PDFLib.PDFContentStream}
  */
 PDFLib.PDFContentStream.of = function(dict, operators, encode){};
+
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFCrossRefSection = function(){};
+/**
+ * @return {PDFLib.PDFCrossRefSection}
+ */
+PDFLib.PDFCrossRefSection.create = function(){};
+/**
+ * @param {PDFLib.PDFRef} ref
+ * @param {number} offset
+ */
+PDFLib.PDFCrossRefSection.prototype.addEntry = function (ref, offset){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFDict = function(){};
+/**
+ * @param {PDFLib.PDFName} key
+ * @param {PDFLib.PDFObject} value
+ */
+PDFLib.PDFDict.prototype.set = function(key, value){};
+/**
+ * @param {PDFLib.PDFName} key
+ * @param {*} typ
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFDict.prototype.lookupMaybe = function(key, typ){};
+/**
+ * @param {PDFLib.PDFName} key
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFDict.prototype.lookup = function(key){};
+
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFWriter = function(){};
+/**
+ * @param {PDFLib.PDFContext} context
+ * @param {number} objectsPerTick
+ * @return {PDFLib.PDFWriter}
+ */
+PDFLib.PDFWriter.forContext = function(context, objectsPerTick){};
+/**
+ * @return {PDFLib.PDFDict}
+ */
+PDFLib.PDFWriter.prototype.createTrailerDict = function(){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFTrailerDict = function(){};
+/**
+ * @param {PDFLib.PDFDict} dict
+ * @return {PDFLib.PDFTrailerDict}
+ */
+PDFLib.PDFTrailerDict.of = function(dict){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFObject}
+ */
+PDFLib.PDFTrailer = function(){};
+/**
+ * @param {number} offset
+ * @return {PDFLib.PDFTrailer}
+ */
+PDFLib.PDFTrailer.forLastCrossRefSectionOffset = function(offset){};

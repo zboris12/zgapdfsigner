@@ -10,6 +10,7 @@ And I use this name to hope the merits from this application will be dedicated t
 * Sign a pdf with an invisible pkcs#7 signature.
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
 * Sign a pdf and set DocMDP(document modification detection and prevention).
+* Add a new signature to a pdf if it has been signed already. (An incremental update)
 * Sign a pdf with a timestamp from TSA(Time Stamp Authority). (Only in Google Apps Script)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
@@ -213,7 +214,7 @@ async function protect2(pdf, cert){
   var eopt = {
     mode: Zga.Crypto.Mode.AES_128,
     pubkeys: [{
-      c: Zga.u8arrToRaw(new Uint8Array(cert)),
+      c: cert,
       p: ["copy", "modify", "copy-extract", "annot-forms", "fill-forms", "extract", "assemble"],
     }],
   };

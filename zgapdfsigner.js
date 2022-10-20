@@ -76,6 +76,8 @@ z.NewRefMap = class extends Map{
 		this.idx = 0;
 		/** @private @type {PDFLib.PDFContext} */
 		this.pdfcont = null;
+		/** @private @type {number} */
+		this.oriLastOnum = 0;
 	}
 
 	/**
@@ -85,28 +87,32 @@ z.NewRefMap = class extends Map{
 	 * @return {PDFLib.PDFRef} If enc is true, the return value is the unique reference reserved for encrypting information.
 	 */
 	reorderPdfRefs(pdfdoc, enc){
-		this.pdfcont = pdfdoc.context;
+		/** @type {z.NewRefMap} */
+		const _this = this;
+		_this.pdfcont = pdfdoc.context;
 		/** @type {PDFLib.PDFRef} */
-		var encref = enc ? this.pdfcont.nextRef() : null;
+		var encref = enc ? _this.pdfcont.nextRef() : null;
 
 		pdfdoc.getPages().forEach(function(/** @type {PDFLib.PDFPage} */a_pg){
-			this.addAndFindRelates(a_pg.ref, "Page");
-		}.bind(this));
-		this.addAndFindRelates(this.pdfcont.trailerInfo.Root, "Catalog");
+			_this.addAndFindRelates(a_pg.ref, "Page");
+		});
+		_this.addAndFindRelates(_this.pdfcont.trailerInfo.Root, "Catalog");
 		if(encref){
-			this.addAndFindRelates(encref, "Encrypt");
+			_this.addAndFindRelates(encref, "Encrypt");
 		}
-		this.pdfcont.enumerateIndirectObjects().forEach(function(/** @type {PdfObjEntry} */a_oety){
+		_this.pdfcont.enumerateIndirectObjects().forEach(function(/** @type {PdfObjEntry} */a_oety){
 			/** @type {string} */
 			var a_tag = a_oety[0].tag;
 			/** @type {z.NewRef} */
-			var a_new = this.get(a_tag);
+			var a_new = _this.get(a_tag);
 			if(!a_new){
-				a_new = new z.NewRef(a_oety[0], ++this.idx);
-				this.set(a_tag, a_new);
+				a_new = new z.NewRef(a_oety[0], ++_this.idx);
+				_this.set(a_tag, a_new);
 			}
-		}.bind(this));
-		this.changeAll();
+		});
+		_this.changeAll();
+		_this.oriLastOnum = _this.pdfcont.largestObjectNumber;
+		_this.pdfcont.largestObjectNumber = _this.idx;
 		return encref;
 	}
 
@@ -115,8 +121,10 @@ z.NewRefMap = class extends Map{
 	 */
 	restoreAll(){
 		this.changeAll(true);
+		this.pdfcont.largestObjectNumber = this.oriLastOnum;
 		this.clear();
 		this.idx = 0;
+		this.oriLastOnum = 0;
 		this.pdfcont = null;
 	}
 
@@ -134,7 +142,7 @@ z.NewRefMap = class extends Map{
 
 	/**
 	 * @private
-	 * @param {PDFLib.PDFObject|Array|Map} a_val
+	 * @param {PDFLib.PDFObject|Array<PDFLib.PDFObject>|Map} a_val
 	 * @param {string=} a_nm
 	 */
 	findRefs(a_val, a_nm){
@@ -200,6 +208,8 @@ z.PdfSigner = class{
 	constructor(signopt){
 		/** @private @const {string} */
 		this.DEFAULT_BYTE_RANGE_PLACEHOLDER = "**********";
+		/** @private @const {number} */
+		this.NEWLINE = 10;
 		/** @private @type {SignOption} */
 		this.opt = signopt;
 		/** @type {forge_key} */
@@ -214,6 +224,10 @@ z.PdfSigner = class{
 		this.siglen = 0;
 		/** @private @type {PDFLib.PDFHexString} */
 		this.sigContents = null;
+		/** @private @type {Uint8Array} */
+		this.oriU8pdf = null;
+		/** @type {Array<PdfObjEntry>} */
+		this.apobjs = [];
 		/** @private @type {boolean} */
 		this.debug = false;
 
@@ -263,72 +277,105 @@ z.PdfSigner = class{
 			throw new Error("ZgaPdfCryptor is not imported.");
 		}
 
+		/** @const {z.PdfSigner} */
+		const _this = this;
 		/** @type {PDFLib.PDFDocument} */
-		var pdfdoc = await z.loadPdf(pdf);
+		var pdfdoc = null;
+		if(pdf.addPage){
+			pdfdoc = /** @type {PDFLib.PDFDocument} */(pdf);
+		}else{
+			if(Array.isArray(pdf)){
+				_this.oriU8pdf = new Uint8Array(pdf);
+			}else{
+				_this.oriU8pdf = PDFLib.toUint8Array(/** @type {(ArrayBuffer|Uint8Array|string)} */(pdf));
+			}
+			pdfdoc = await PDFLib.PDFDocument.load(_this.oriU8pdf);
+		}
 
-		if(this.opt.drawinf && this.opt.drawinf.imgData && !this.opt.drawinf.img){
+		if(_this.opt.drawinf && _this.opt.drawinf.imgData && !_this.opt.drawinf.img){
 			/** @type {Uint8Array|ArrayBuffer|string} */
 			var imgData2 = null;
-			if(Array.isArray(this.opt.drawinf.imgData)){
-				imgData2 = new Uint8Array(this.opt.drawinf.imgData);
+			if(Array.isArray(_this.opt.drawinf.imgData)){
+				imgData2 = new Uint8Array(_this.opt.drawinf.imgData);
 			}else{
-				imgData2 = this.opt.drawinf.imgData;
+				imgData2 = _this.opt.drawinf.imgData;
 			}
-			if(this.opt.drawinf.imgType == "png"){
-				this.opt.drawinf.img = await pdfdoc.embedPng(imgData2);
-			}else if(this.opt.drawinf.imgType == "jpg"){
-				this.opt.drawinf.img = await pdfdoc.embedJpg(imgData2);
+			if(_this.opt.drawinf.imgType == "png"){
+				_this.opt.drawinf.img = await pdfdoc.embedPng(imgData2);
+			}else if(_this.opt.drawinf.imgType == "jpg"){
+				_this.opt.drawinf.img = await pdfdoc.embedJpg(imgData2);
 			}else{
-				throw new Error("Unkown image type. " + this.opt.drawinf.imgType);
+				throw new Error("Unkown image type. " + _this.opt.drawinf.imgType);
 			}
 		}
 
-		/** @type {PDFLib.PDFRef} */
-		var encref = null;
-		if(this.addSignHolder(pdfdoc)){
-			// Signature in DocMDP mode may be invalid if the definitions of references are too chaotic
-			// So we make the order of references more neet.
-			await pdfdoc.flush();
-			encref = z.newRefs.reorderPdfRefs(pdfdoc, cypopt ? true : false);
-		}
-		this.log("A signature holder has been added to the pdf.");
+		
+		/** @type {boolean} *///append mode or not
+		var apmode = _this.addSignHolder(pdfdoc);
+		await pdfdoc.flush();
+		_this.log("A signature holder has been added to the pdf.");
 
 		/** @type {forge_cert} */
-		var cert = this.loadP12cert(this.opt.p12cert, this.opt.pwd);
+		var cert = _this.loadP12cert(_this.opt.p12cert, _this.opt.pwd);
 		if(cert){
 			z.fixCertAttributes(cert);
 		}
 
-		if(cypopt){
-			if(cypopt.pubkeys){
-				if(cypopt.pubkeys.length == 0){
-					cypopt.pubkeys.push({
-						c: cert,
-					});
-				}else{
-					cypopt.pubkeys.forEach(function(/** @type {PubKeyInfo} */a_pubkey){
-						// If there is no c in the PubKeyInfo, set cert to it.
-						if(!a_pubkey.c){
-							a_pubkey.c = cert;
-						}
-					});
-				}
+		if(apmode){
+			if(_this.oriU8pdf){
+				_this.log("The pdf has been signed already, so we add a new signature to it.");
+			}else{
+				throw new Error("When adding a new signature to a signed pdf, the original literal datas are necessary.");
 			}
-			/** @type {Zga.PdfCryptor} */
-			var cypt = new z.PdfCryptor(cypopt);
-			await cypt.encryptPdf(pdfdoc, encref);
-			this.log("Pdf data has been encrypted.");
+
+			// Find the changed objects
+			/** @type {PDFLib.PDFDocument} */
+			var oriPdfdoc = await PDFLib.PDFDocument.load(_this.oriU8pdf);
+			pdfdoc.context.enumerateIndirectObjects().forEach(function(/** @type {PdfObjEntry} */a_ele){
+				/** @type {PDFLib.PDFObject} */
+				var a_obj = oriPdfdoc.context.lookup(a_ele[0]);
+				if(!(a_obj && _this.isamePdfObject(a_ele[1], a_obj))){
+					_this.apobjs.push(a_ele);
+				}
+			});
+
+		}else{
+			// If the definitions of references are too chaotic, a signature contains DocMDP or after adding a new signature,
+			// this signature may be invalid. So we make the order of references more neet.
+			/** @type {PDFLib.PDFRef} */
+			var encref = z.newRefs.reorderPdfRefs(pdfdoc, cypopt ? true : false);
+
+			if(cypopt){
+				if(cypopt.pubkeys){
+					if(cypopt.pubkeys.length == 0){
+						cypopt.pubkeys.push({
+							c: cert,
+						});
+					}else{
+						cypopt.pubkeys.forEach(function(/** @type {PubKeyInfo} */a_pubkey){
+							// If there is no c in the PubKeyInfo, set cert to it.
+							if(!a_pubkey.c){
+								a_pubkey.c = cert;
+							}
+						});
+					}
+				}
+				/** @type {Zga.PdfCryptor} */
+				var cypt = new z.PdfCryptor(cypopt);
+				await cypt.encryptPdf(pdfdoc, encref);
+				_this.log("Pdf data has been encrypted.");
+			}
 		}
 
 		/** @type {Uint8Array} */
-		var ret = await this.saveAndSign(pdfdoc);
+		var ret = await _this.saveAndSign(pdfdoc);
 		if(!ret){
-			this.log("Change size of signature's placeholder and retry.");
-			this.sigContents.value = "0".repeat(this.siglen);
-			ret = await this.saveAndSign(pdfdoc);
+			_this.log("Change size of signature's placeholder and retry.");
+			_this.sigContents.value = "0".repeat(_this.siglen);
+			ret = await _this.saveAndSign(pdfdoc);
 		}
 		if(ret){
-			this.log("Signing pdf accomplished.");
+			_this.log("Signing pdf accomplished.");
 		}else{
 			throw new Error("Failed to sign the pdf.");
 		}
@@ -350,16 +397,158 @@ z.PdfSigner = class{
 	 */
 	async saveAndSign(pdfdoc){
 		/** @type {Uint8Array} */
-		var uarr = await pdfdoc.save({"useObjectStreams": false});
+		var uarr = null;
+		if(this.apobjs.length > 0){
+			uarr = this.appendSignature(pdfdoc);
+		}else{
+			uarr = await pdfdoc.save({"useObjectStreams": false});
+		}
 		/** @type {string} */
-		var pdfstr = z.u8arrToRaw(uarr);
+		var pdfstr = z.u8arrToRaw(uarr) + String.fromCharCode(this.NEWLINE);
 		return this.signPdf(pdfstr);
 	}
 
 	/**
 	 * @private
 	 * @param {PDFLib.PDFDocument} pdfdoc
-	 * @return {boolean} DocMDP mode or not.
+	 * @return {Uint8Array}
+	 */
+	appendSignature(pdfdoc){
+		/** @const {z.PdfSigner} */
+		const _this = this;
+		/** @type {PDFLib.PDFCrossRefSection} */
+		var xref = PDFLib.PDFCrossRefSection.create();
+		/** @type {number} */
+		var stpos = _this.oriU8pdf.length;
+		/** @type {Array<number>} */
+		var buff = [];
+		buff[0] = _this.NEWLINE;
+		stpos++;
+		_this.apobjs.forEach(function(/** @type {PdfObjEntry} */a_ele){
+			/** @type {number} */
+			var a_len = _this.objEntryToBytes(a_ele, buff);
+			xref.addEntry(a_ele[0], stpos);
+			stpos += a_len;
+		});
+		xref.copyBytesInto(buff, buff.length);
+
+		/** @type {PDFLib.PDFDict} */
+		var tdic = PDFLib.PDFWriter.forContext(pdfdoc.context, 0).createTrailerDict();
+		tdic.set(PDFLib.PDFName.of("Prev"), PDFLib.PDFNumber.of(_this.findPrev(_this.oriU8pdf)));
+		/** @type {PDFLib.PDFTrailerDict} */
+		var ptdic = PDFLib.PDFTrailerDict.of(tdic);
+		ptdic.copyBytesInto(buff, buff.length);
+		buff.push(_this.NEWLINE);
+
+		/** @type {PDFLib.PDFTrailer} */
+		var ptlr = PDFLib.PDFTrailer.forLastCrossRefSectionOffset(stpos);
+		ptlr.copyBytesInto(buff, buff.length);
+		/** @type {Uint8Array} */
+		var ret = new Uint8Array(_this.oriU8pdf.length + buff.length);
+		ret.set(/** @type {!ArrayBufferView} */(_this.oriU8pdf));
+		ret.set(/** @type {!ArrayBufferView} */(new Uint8Array(buff)), _this.oriU8pdf.length);
+		return ret;
+	}
+
+	/**
+	 * @private
+	 * @param {Uint8Array} u8pdf
+	 * @return {number}
+	 */
+	findPrev(u8pdf){
+		/** @const {Uint8Array} */
+		const eof = Zga.rawToU8arr("%%EOF");
+		/** @const {number} */
+		const c0 = "0".charCodeAt(0);
+		/** @const {number} */
+		const c9 = "9".charCodeAt(0);
+		/** @type {number} */
+		var step = 0;
+		/** @type {string} */
+		var num = "";
+		for(var i = u8pdf.length - eof.length; i >= 0; i--){
+			switch(step){
+			case 0:
+				/** @type {boolean} */
+				var flg = true;
+				for(var j=0; j<eof.length; j++){
+					if(u8pdf[i+j] != eof[j]){
+						flg = false;
+						break;
+					}
+				}
+				if(flg){
+					step = 1;
+				}
+				break;
+			case 1:
+				if(u8pdf[i] >= c0 && u8pdf[i] <= c9){
+					num = String.fromCharCode(u8pdf[i]);
+					step = 2;
+				}
+				break;
+			case 2:
+				if(u8pdf[i] >= c0 && u8pdf[i] <= c9){
+					num = String.fromCharCode(u8pdf[i]) + num;
+				}else{
+					step = 9;
+				}
+				break;
+			}
+			if(step >= 9){
+				break;
+			}
+		}
+		return parseInt(num, 10);
+	}
+
+	/**
+	 * @private
+	 * @param {PDFLib.PDFObject} obj1
+	 * @param {PDFLib.PDFObject} obj2
+	 * @return {boolean}
+	 */
+	isamePdfObject(obj1, obj2){
+		/** @type {Array<number>} */
+		var buff1 = [];
+		obj1.copyBytesInto(buff1, 0);
+		/** @type {Array<number>} */
+		var buff2 = [];
+		obj2.copyBytesInto(buff2, 0);
+		if(buff1.length != buff2.length){
+			return false;
+		}
+		for(var i=0; i<buff1.length; i++){
+			if(buff1[i] != buff2[i]){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * @private
+	 * @param {PdfObjEntry} objety
+	 * @param {Array<number>} buff
+	 * @return {number}
+	 */
+	objEntryToBytes(objety, buff){
+		/** @type {number} */
+		var before = buff.length;
+		objety[0].copyBytesInto(buff, buff.length);
+		PDFLib.copyStringIntoBuffer("obj", buff, buff.length - 1);
+		buff[buff.length] = this.NEWLINE;
+		objety[1].copyBytesInto(buff, buff.length);
+		buff[buff.length] = this.NEWLINE;
+		PDFLib.copyStringIntoBuffer("endobj", buff, buff.length);
+		buff[buff.length] = this.NEWLINE;
+		return buff.length - before;
+	}
+
+	/**
+	 * @private
+	 * @param {PDFLib.PDFDocument} pdfdoc
+	 * @return {boolean} append mode or not
 	 */
 	addSignHolder(pdfdoc){
 		/** @const {number} */
@@ -376,6 +565,28 @@ z.PdfSigner = class{
 		if(docMdp && !strmRef){
 			strmRef = signcrt.createEmptyField(pdfcont);
 		}
+
+		/** @type {Array<string>} */
+		var oldSigs = [];
+		/** @type {PDFLib.PDFAcroForm} */
+		var afrm = pdfdoc.catalog.getOrCreateAcroForm();
+		afrm.getAllFields().forEach(function(/** @type {PdfFieldInfo} */a_finf){
+			if(a_finf[0] instanceof PDFLib.PDFAcroSignature){
+				/** @type {PDFLib.PDFString|PDFLib.PDFHexString} */
+				var a_t = a_finf[0].T();
+				if(a_t instanceof PDFLib.PDFString){
+					oldSigs.push(a_t.asString());
+				}else if(a_t instanceof PDFLib.PDFHexString){
+					oldSigs.push(a_t.decodeText());
+				}
+			}
+		});
+		if(oldSigs.length > 0 && docMdp){
+			throw new Error("Since the pdf has been signed, can NOT sign with DocMDP. Because the signature field that contains DocMDP must be the first signed field in the document.");
+		}
+
+		/** @type {string} */
+		var signm = this.fixSigName(oldSigs, this.opt.signame);
 
 		/** @type {Date} */
 		var signdate = new Date();
@@ -440,7 +651,7 @@ z.PdfSigner = class{
 			"FT": "Sig",
 			"Rect": signcrt.getSignRect(),
 			"V": signatureDictRef,
-			"T": this.convToPDFString(this.opt.signame ? this.opt.signame : "Signature1"),
+			"T": this.convToPDFString(signm),
 			"F": 132,
 			"P": page.ref,
 		};
@@ -453,16 +664,19 @@ z.PdfSigner = class{
 		var widgetDictRef = pdfcont.register(pdfcont.obj(widgetObj));
 
 		// Add our signature widget to the page
-		page.node.set(PDFLib.PDFName.of("Annots"), pdfcont.obj([widgetDictRef]));
+		/** @type {PDFLib.PDFArray} */
+		var ans = page.node.Annots();
+		if(!ans){
+			ans = new PDFLib.PDFArray(pdfcont);
+			page.node.set(PDFLib.PDFName.Annots, ans);
+		}
+		ans.push(widgetDictRef);
 
-		// Create an AcroForm object containing our signature widget
-		pdfdoc.catalog.set(
-			PDFLib.PDFName.of("AcroForm"),
-			pdfcont.obj({
-				"SigFlags": 3,
-				"Fields": [widgetDictRef],
-			}),
-		);
+		if(!afrm.dict.lookup(PDFLib.PDFName.of("SigFlags"))){
+			afrm.dict.set(PDFLib.PDFName.of("SigFlags"), PDFLib.PDFNumber.of(3));
+		}
+		afrm.addField(widgetDictRef);
+
 		if(docMdp){
 			pdfdoc.catalog.set(
 				PDFLib.PDFName.of("Perms"),
@@ -470,10 +684,34 @@ z.PdfSigner = class{
 					"DocMDP": signatureDictRef,
 				}),
 			);
-			return true;
+		}
 
+		return (oldSigs.length > 0);
+	}
+
+	/**
+	 * @private
+	 * @param {Array<string>} oldSigs
+	 * @param {string=} signm
+	 * @param {number=} idx
+	 * @return {string}
+	 */
+	fixSigName(oldSigs, signm, idx){
+		if(!signm){
+			signm = "Signature";
+			idx = 1;
+		}
+		/** @type {string} */
+		var nm = signm;
+		if(idx){
+			nm += idx;
 		}else{
-			return false;
+			idx = 0;
+		}
+		if(oldSigs.indexOf(nm) >= 0){
+			return this.fixSigName(oldSigs, signm, idx+1);
+		}else{
+			return nm;
 		}
 	}
 
@@ -895,14 +1133,13 @@ z.SignatureCreator = class{
 
 		this.rect = this.calcRect(pgrot.angle, areainf);
 
-		/** @type {PDFLib.PDFObject} */
-		var frmDict = pdfdoc.context.obj({
+		var frmDict = /** @type {PDFLib.PDFDict} */(pdfdoc.context.obj({
 			"Type": "XObject",
 			"Subtype": "Form",
 			"FormType": 1,
 			"BBox": [0, 0, areainf.w, areainf.h],
 			"Resources": rscObj,
-		});
+		}));
 		/** @type {PDFLib.PDFContentStream} */
 		var strm = PDFLib.PDFContentStream.of(frmDict, sigOprs, true);
 		return pdfdoc.context.register(strm);
