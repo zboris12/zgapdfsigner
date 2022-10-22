@@ -1,0 +1,15 @@
+{
+  "name": "zgapdfsigner",
+  "version": "2.3.0",
+  "private": false,
+  "scripts": {
+    "dev": "",
+    "build": ""
+  },
+  "dependencies": {
+    "pdf-lib": "1.17.1",
+    "node-forge": "1.3.1"
+  },
+  "devDependencies": {
+  }
+}

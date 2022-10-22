@@ -16,6 +16,23 @@ z.TSAURLS = {
 	"7": {url: "https://freetsa.org/tsr", len: 14500},
 };
 
+// Google Apps Script
+if(globalThis.UrlFetchApp){
+	z.UrlFetchApp = {};
+	/**
+	 * @param {string} url
+	 * @param {UrlFetchParams} params
+	 * @return {Promise<Uint8Array>}
+	 */
+	z.UrlFetchApp.fetch = function(url, params){
+		return new Promise(function(resolve){
+			/** @type {GBlob} */
+			var tblob = UrlFetchApp.fetch(url, params).getBlob();
+			resolve(new Uint8Array(tblob.getBytes()));
+		});
+	};
+}
+
 z.NewRef = class{
 	/**
 	 * @param {PDFLib.PDFRef} ref
@@ -247,7 +264,7 @@ z.PdfSigner = class{
 			}
 		}
 		if(this.tsainf){
-			if(!globalThis.UrlFetchApp){
+			if(!z.UrlFetchApp){
 				throw new Error("Because of the CORS security restrictions, signing with TSA is not supported in web browser.");
 			}
 			if(z.TSAURLS[this.tsainf.url]){
@@ -405,7 +422,7 @@ z.PdfSigner = class{
 		}
 		/** @type {string} */
 		var pdfstr = z.u8arrToRaw(uarr) + String.fromCharCode(this.NEWLINE);
-		return this.signPdf(pdfstr);
+		return await this.signPdf(pdfstr);
 	}
 
 	/**
@@ -770,9 +787,9 @@ z.PdfSigner = class{
 	/**
 	 * @private
 	 * @param {string} pdfstr
-	 * @return {Uint8Array}
+	 * @return {Promise<Uint8Array>}
 	 */
-	signPdf(pdfstr){
+	async signPdf(pdfstr){
 		/** @type {Date} */
 		var signdate = new Date();
 		if(this.opt.signdate instanceof Date && !this.tsainf){
@@ -850,7 +867,7 @@ z.PdfSigner = class{
 
 		if(this.tsainf){
 			/** @type {forge.asn1} */
-			var tsatoken = this.queryTsa(p7.signers[0].signature);
+			var tsatoken = await this.queryTsa(p7.signers[0].signature);
 			p7.signerInfos[0].value.push(tsatoken);
 			this.log("Timestamp from " + this.tsainf.url + " has been added to the signature.");
 		}
@@ -972,9 +989,9 @@ z.PdfSigner = class{
 	/**
 	 * @private
 	 * @param {string=} signature
-	 * @return {forge.asn1}
+	 * @return {Promise<forge.asn1>}
 	 */
-	queryTsa(signature){
+	async queryTsa(signature){
 		/** @lends {forge.asn1} */
 		var asn1 = forge.asn1;
 		/** @type {string} */
@@ -987,10 +1004,10 @@ z.PdfSigner = class{
 			"headers": {"Content-Type": "application/timestamp-query"},
 			"payload": tu8s,
 		};
-		/** @type {GBlob} */
-		var tblob = UrlFetchApp.fetch(this.tsainf.url, options).getBlob();
+		/** @type {Uint8Array} */
+		var tesp = await z.UrlFetchApp.fetch(this.tsainf.url, options);
 		/** @type {string} */
-		var tstr = z.u8arrToRaw(new Uint8Array(tblob.getBytes()));
+		var tstr = z.u8arrToRaw(tesp);
 		/** @type {forge.asn1} */
 		var token = asn1.fromDer(tstr).value[1];
 
