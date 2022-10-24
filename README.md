@@ -1,6 +1,6 @@
 # ZgaPdfSigner
 A javascript tool to sign a pdf or set protection of a pdf in web browser.  
-And it also can be used in Google Apps Script.  
+And it also can be used in Google Apps Script and nodejs.  
 
 PS: __ZGA__ is the abbreviation of my father's name.  
 And I use this name to hope the merits from this application will be dedicated to my parents.
@@ -11,7 +11,8 @@ And I use this name to hope the merits from this application will be dedicated t
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
 * Sign a pdf and set DocMDP(document modification detection and prevention).
 * Add a new signature to a pdf if it has been signed already. (An incremental update)
-* Sign a pdf with a timestamp from TSA(Time Stamp Authority). (Only in Google Apps Script)
+* Add a document timestamp from TSA(Time Stamp Authority). (Only in Google Apps Script and nodejs)
+* Sign a pdf with a timestamp from TSA. (Only in Google Apps Script and nodejs)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
   * 128bit RC4 Encryption
@@ -138,8 +139,8 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
 
 ## Detail of SignOption
 
-* __p12cert__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: Certificate's data
-* __pwd__: string :point_right: The passphrase of the certificate
+* __p12cert__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) Certificate's data. In the case of adding a document timestamp, it must be omitted.
+* __pwd__: string :point_right: (Optional) The passphrase of the certificate. In the case of adding a document timestamp, it must be omitted.
 * __permission__: number :point_right: (Optional) The modification permissions granted for this document.
   This is a setting of DocMDP(document modification detection and prevention). Valid values are:
   * 1: No changes to the document are permitted; any change to the document invalidates the signature.
@@ -148,7 +149,7 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
 * __reason__: string :point_right: (Optional) The reason for signing
 * __location__: string :point_right: (Optional) Your location
 * __contact__: string :point_right: (Optional) Your contact information
-* __signdate__: Date|string|_TsaServiceInfo_ :point_right: (Optional)
+* __signdate__: Date|string|_TsaServiceInfo_ :point_right: (Optional) In the case of adding a document timestamp, it can't be omitted and can't be a Date.
   * When it is a Date, it means the date and time of signing.
   * When it is a string, it can be an url of TSA or an index of the preset TSAs as below:
     * "1": http://ts.ssl.com
@@ -161,6 +162,7 @@ fld.createFile(Utilities.newBlob(u8arr, "application/pdf").setName("signed_test.
   * When it is a _TsaServiceInfo_, it means a full customized information of a TSA.
     * __url__: string :point_right: The url of TSA
     * __len__: number :point_right: (Optional) The length of signature's placeholder
+    * __headers__: Object<string, *> :point_right: (Optional) The customized headers for sending to tsa server
   * When it is omitted, the system timestamp will be used.
 * __signame__: string :point_right: (Optional) The name of the signature
 * __drawinf__: _SignDrawInfo_ :point_right: (Optional) Visible signature's information

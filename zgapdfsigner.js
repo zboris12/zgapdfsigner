@@ -18,13 +18,12 @@ z.TSAURLS = {
 
 // Google Apps Script
 if(globalThis.UrlFetchApp){
-	z.UrlFetchApp = {};
 	/**
 	 * @param {string} url
 	 * @param {UrlFetchParams} params
 	 * @return {Promise<Uint8Array>}
 	 */
-	z.UrlFetchApp.fetch = function(url, params){
+	z.urlFetch = function(url, params){
 		return new Promise(function(resolve){
 			/** @type {GBlob} */
 			var tblob = UrlFetchApp.fetch(url, params).getBlob();
@@ -264,7 +263,7 @@ z.PdfSigner = class{
 			}
 		}
 		if(this.tsainf){
-			if(!z.UrlFetchApp){
+			if(!z.urlFetch){
 				throw new Error("Because of the CORS security restrictions, signing with TSA is not supported in web browser.");
 			}
 			if(z.TSAURLS[this.tsainf.url]){
@@ -326,17 +325,20 @@ z.PdfSigner = class{
 			}
 		}
 
-		
-		/** @type {boolean} *///append mode or not
-		var apmode = _this.addSignHolder(pdfdoc);
-		await pdfdoc.flush();
-		_this.log("A signature holder has been added to the pdf.");
-
 		/** @type {forge_cert} */
 		var cert = _this.loadP12cert(_this.opt.p12cert, _this.opt.pwd);
 		if(cert){
 			z.fixCertAttributes(cert);
+		}else if(_this.tsainf){
+			_this.log("No certificate is specified, so only add a document timestamp.")
+		}else{
+			throw new Error("Nothing to do because no certificate nor tsa is specified.");
 		}
+
+		/** @type {boolean} *///append mode or not
+		var apmode = _this.addSignHolder(pdfdoc);
+		await pdfdoc.flush();
+		_this.log("A signature holder has been added to the pdf.");
 
 		if(apmode){
 			if(_this.oriU8pdf){
@@ -564,20 +566,76 @@ z.PdfSigner = class{
 
 	/**
 	 * @private
+	 * @param {Array<number>|Uint8Array|ArrayBuffer|string=} p12cert
+	 * @param {string=} pwd
+	 * @return {forge_cert}
+	 */
+	loadP12cert(p12cert, pwd){
+		// load P12 certificate
+		if(!p12cert){
+			return null;
+		}else if(typeof p12cert !== "string"){
+			p12cert = z.u8arrToRaw(new Uint8Array(p12cert));
+		}
+		// Convert Buffer P12 to a forge implementation.
+		/** @type {forge.asn1} */
+		var p12Asn1 = forge.asn1.fromDer(p12cert);
+		/** @type {forge.pkcs12} */
+		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, pwd);
+		// Extract safe bags by type.
+		// We will need all the certificates and the private key.
+		/** @type {Object<string|number, P12Bag>} */
+		var certBags = p12.getBags({
+			"bagType": forge.pki.oids.certBag,
+		})[forge.pki.oids.certBag];
+		/** @type {Object<string|number, P12Bag>} */
+		var keyBags = p12.getBags({
+			"bagType": forge.pki.oids.pkcs8ShroudedKeyBag,
+		})[forge.pki.oids.pkcs8ShroudedKeyBag];
+		this.privateKey = keyBags[0].key;
+		if(certBags){
+			// Get all the certificates (-cacerts & -clcerts)
+			// Keep track of the last found client certificate.
+			// This will be the public key that will be bundled in the signature.
+			Object.keys(certBags).forEach(function(a_ele){
+				/** @type {forge_cert} */
+				var a_cert = certBags[a_ele].cert;
+
+				this.certs.push(a_cert);
+
+				// Try to find the certificate that matches the private key.
+				if(this.privateKey.n.compareTo(a_cert.publicKey.n) === 0
+				&& this.privateKey.e.compareTo(a_cert.publicKey.e) === 0){
+					this.certIdx = this.certs.length;
+				}
+			}.bind(this));
+		}
+		if(this.certIdx > 0){
+			return this.certs[--this.certIdx];
+			// z.fixCertAttributes(this.certs[this.certIdx]);
+		}else{
+			throw new Error("Failed to find a certificate.");
+		}
+	}
+
+	/**
+	 * @private
 	 * @param {PDFLib.PDFDocument} pdfdoc
 	 * @return {boolean} append mode or not
 	 */
 	addSignHolder(pdfdoc){
+		/** @const {z.PdfSigner} */
+		const _this = this;
 		/** @const {number} */
-		const docMdp = (this.opt.permission >= 1 && this.opt.permission <= 3) ? this.opt.permission : 0;
+		const docMdp = (_this.certs.length > 0 && _this.opt.permission >= 1 && _this.opt.permission <= 3) ? _this.opt.permission : 0;
 		/** @const {PDFLib.PDFContext} */
 		const pdfcont = pdfdoc.context;
 		/** @const {z.SignatureCreator} */
-		const signcrt = new z.SignatureCreator(this.opt.drawinf);
+		const signcrt = new z.SignatureCreator(_this.opt.drawinf);
 		/** @const {PDFLib.PDFPage} */
 		const page = pdfdoc.getPages()[signcrt.getPageIndex()];
 		/** @type {PDFLib.PDFRef} */
-		var strmRef = signcrt.createStream(pdfdoc, this.opt.signame);
+		var strmRef = signcrt.createStream(pdfdoc, _this.opt.signame);
 
 		if(docMdp && !strmRef){
 			strmRef = signcrt.createEmptyField(pdfcont);
@@ -603,23 +661,23 @@ z.PdfSigner = class{
 		}
 
 		/** @type {string} */
-		var signm = this.fixSigName(oldSigs, this.opt.signame);
+		var signm = _this.fixSigName(oldSigs, _this.opt.signame);
 
 		/** @type {Date} */
 		var signdate = new Date();
-		if(this.opt.signdate instanceof Date && !this.tsainf){
-			signdate = this.opt.signdate;
+		if(_this.opt.signdate instanceof Date && !_this.tsainf){
+			signdate = _this.opt.signdate;
 		}
 
 		/** @type {PDFLib.PDFArray} */
 		var bytrng = new PDFLib.PDFArray(pdfcont);
 		bytrng.push(PDFLib.PDFNumber.of(0));
-		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
-		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
-		bytrng.push(PDFLib.PDFName.of(this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(_this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(_this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
+		bytrng.push(PDFLib.PDFName.of(_this.DEFAULT_BYTE_RANGE_PLACEHOLDER));
 
-		this.siglen = /** @type {number} */(this.tsainf ? this.tsainf.len : 3322);
-		this.sigContents = PDFLib.PDFHexString.of("0".repeat(this.siglen));
+		_this.siglen = /** @type {number} */(_this.tsainf ? _this.tsainf.len : 3322);
+		_this.sigContents = PDFLib.PDFHexString.of("0".repeat(_this.siglen));
 
 		/** @type {Object<string, *>} */
 		var signObj = {
@@ -627,14 +685,19 @@ z.PdfSigner = class{
 			"Filter": "Adobe.PPKLite",
 			"SubFilter": "adbe.pkcs7.detached",
 			"ByteRange": bytrng,
-			"Contents": this.sigContents,
-			"M": PDFLib.PDFString.fromDate(signdate),
+			"Contents": _this.sigContents,
 			"Prop_Build": pdfcont.obj({
 				"App": pdfcont.obj({
 					"Name": "ZgaPdfSinger",
 				}),
 			}),
 		};
+		if(_this.certs.length > 0){
+			signObj.M = PDFLib.PDFString.fromDate(signdate);
+		}else{
+			signObj.Type = "DocTimeStamp";
+			signObj.SubFilter = "ETSI.RFC3161";
+		}
 		if(docMdp){
 			/** @type {PDFLib.PDFArray} */
 			var rfrc = new PDFLib.PDFArray(pdfcont);
@@ -649,14 +712,14 @@ z.PdfSigner = class{
 			}));
 			signObj["Reference"] = rfrc;
 		}
-		if(this.opt.reason){
-			signObj["Reason"] = this.convToPDFString(this.opt.reason);
+		if(_this.opt.reason){
+			signObj["Reason"] = _this.convToPDFString(_this.opt.reason);
 		}
-		if(this.opt.location){
-			signObj["Location"] = this.convToPDFString(this.opt.location);
+		if(_this.opt.location){
+			signObj["Location"] = _this.convToPDFString(_this.opt.location);
 		}
-		if(this.opt.contact){
-			signObj["ContactInfo"] = this.convToPDFString(this.opt.contact);
+		if(_this.opt.contact){
+			signObj["ContactInfo"] = _this.convToPDFString(_this.opt.contact);
 		}
 		/** @type {PDFLib.PDFRef} */
 		var signatureDictRef = pdfcont.register(pdfcont.obj(signObj));
@@ -668,7 +731,7 @@ z.PdfSigner = class{
 			"FT": "Sig",
 			"Rect": signcrt.getSignRect(),
 			"V": signatureDictRef,
-			"T": this.convToPDFString(signm),
+			"T": _this.convToPDFString(signm),
 			"F": 132,
 			"P": page.ref,
 		};
@@ -734,53 +797,23 @@ z.PdfSigner = class{
 
 	/**
 	 * @private
-	 * @param {Array<number>|Uint8Array|ArrayBuffer|string} p12cert
-	 * @param {string} pwd
-	 * @return {forge_cert}
+	 * @param {string} str
+	 * @return {PDFLib.PDFString|PDFLib.PDFHexString}
 	 */
-	loadP12cert(p12cert, pwd){
-		// load P12 certificate
-		if(typeof p12cert !== "string"){
-			p12cert = z.u8arrToRaw(new Uint8Array(p12cert));
+	convToPDFString(str){
+		// Check if there is a multi-bytes char in the string.
+		/** @type {boolean} */
+		var flg = false;
+		for(var i=0; i<str.length; i++){
+			if(str.charCodeAt(i) > 0xFF){
+				flg = true;
+				break;
+			}
 		}
-		// Convert Buffer P12 to a forge implementation.
-		/** @type {forge.asn1} */
-		var p12Asn1 = forge.asn1.fromDer(p12cert);
-		/** @type {forge.pkcs12} */
-		var p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, true, pwd);
-		// Extract safe bags by type.
-		// We will need all the certificates and the private key.
-		/** @type {Object<string|number, P12Bag>} */
-		var certBags = p12.getBags({
-			"bagType": forge.pki.oids.certBag,
-		})[forge.pki.oids.certBag];
-		/** @type {Object<string|number, P12Bag>} */
-		var keyBags = p12.getBags({
-			"bagType": forge.pki.oids.pkcs8ShroudedKeyBag,
-		})[forge.pki.oids.pkcs8ShroudedKeyBag];
-		this.privateKey = keyBags[0].key;
-		if(certBags){
-			// Get all the certificates (-cacerts & -clcerts)
-			// Keep track of the last found client certificate.
-			// This will be the public key that will be bundled in the signature.
-			Object.keys(certBags).forEach(function(a_ele){
-				/** @type {forge_cert} */
-				var a_cert = certBags[a_ele].cert;
-
-				this.certs.push(a_cert);
-
-				// Try to find the certificate that matches the private key.
-				if(this.privateKey.n.compareTo(a_cert.publicKey.n) === 0
-				&& this.privateKey.e.compareTo(a_cert.publicKey.e) === 0){
-					this.certIdx = this.certs.length;
-				}
-			}.bind(this));
-		}
-		if(this.certIdx > 0){
-			return this.certs[--this.certIdx];
-			// z.fixCertAttributes(this.certs[this.certIdx]);
+		if(flg){
+			return PDFLib.PDFHexString.fromText(str);
 		}else{
-			throw new Error("Failed to find a certificate.");
+			return PDFLib.PDFString.of(str);
 		}
 	}
 
@@ -790,12 +823,6 @@ z.PdfSigner = class{
 	 * @return {Promise<Uint8Array>}
 	 */
 	async signPdf(pdfstr){
-		/** @type {Date} */
-		var signdate = new Date();
-		if(this.opt.signdate instanceof Date && !this.tsainf){
-			signdate = this.opt.signdate;
-		}
-
 		// Finds ByteRange information within a given PDF Buffer if one exists
 		/** @type {Array<string>} */
 		var byteRangeStrings = pdfstr.match(/\/ByteRange\s*\[{1}\s*(?:(?:\d*|\/\*{10})\s+){3}(?:\d+|\/\*{10}){1}\s*]{1}/g);
@@ -833,48 +860,61 @@ z.PdfSigner = class{
 		// Remove the placeholder signature
 		pdfstr = pdfstr.slice(0, byteRange[1]) + pdfstr.slice(byteRange[2], byteRange[2] + byteRange[3]);
 
-		// Here comes the actual PKCS#7 signing.
-		/** @type {forge.pkcs7} */
-		var p7 = forge.pkcs7.createSignedData();
-		// Start off by setting the content.
-		p7.content = forge.util.createBuffer(pdfstr);
+		/** @type {forge.asn1} */
+		var asn1sig = null;
+		if(this.certs.length > 0){
+			/** @type {Date} */
+			var signdate = new Date();
+			if(this.opt.signdate instanceof Date && !this.tsainf){
+				signdate = this.opt.signdate;
+			}
 
-		// Add all the certificates (-cacerts & -clcerts) to p7
-		this.certs.forEach(function(a_cert){
-			p7.addCertificate(a_cert);
-		});
+			// Here comes the actual PKCS#7 signing.
+			/** @type {forge.pkcs7} */
+			var p7 = null;
+			p7 = forge.pkcs7.createSignedData();
+			// Start off by setting the content.
+			p7.content = forge.util.createBuffer(pdfstr);
 
-		// Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
-		p7.addSigner({
-			key: this.privateKey,
-			certificate: this.certs[this.certIdx],
-			digestAlgorithm: forge.pki.oids.sha256,
-			authenticatedAttributes: [
-				{
-					"type": forge.pki.oids.contentType,
-					"value": forge.pki.oids.data,
-				}, {
-					"type": forge.pki.oids.messageDigest,
-				}, {
-					"type": forge.pki.oids.signingTime,
-					"value": signdate,
-				},
-			],
-		});
+			// Add all the certificates (-cacerts & -clcerts) to p7
+			this.certs.forEach(function(a_cert){
+				p7.addCertificate(a_cert);
+			});
 
-		// Sign in detached mode.
-		p7.sign({"detached": true});
+			// Add a sha256 signer. That's what Adobe.PPKLite adbe.pkcs7.detached expects.
+			p7.addSigner({
+				key: this.privateKey,
+				certificate: this.certs[this.certIdx],
+				digestAlgorithm: forge.pki.oids.sha256,
+				authenticatedAttributes: [
+					{
+						"type": forge.pki.oids.contentType,
+						"value": forge.pki.oids.data,
+					}, {
+						"type": forge.pki.oids.messageDigest,
+					}, {
+						"type": forge.pki.oids.signingTime,
+						"value": signdate,
+					},
+				],
+			});
 
-		if(this.tsainf){
-			/** @type {forge.asn1} */
-			var tsatoken = await this.queryTsa(p7.signers[0].signature);
-			p7.signerInfos[0].value.push(tsatoken);
-			this.log("Timestamp from " + this.tsainf.url + " has been added to the signature.");
+			// Sign in detached mode.
+			p7.sign({"detached": true});
+
+			if(this.tsainf){
+				/** @type {forge.asn1} */
+				var tsatoken = await this.queryTsa(p7.signers[0].signature);
+				p7.signerInfos[0].value.push(tsatoken);
+			}
+			asn1sig = p7.toAsn1();
+		}else{
+			asn1sig = await this.queryTsa(pdfstr, true);
 		}
 
 		// Check if the PDF has a good enough placeholder to fit the signature.
 		/** @type {string} */
-		var sighex = forge.asn1.toDer(p7.toAsn1()).toHex();
+		var sighex = forge.asn1.toDer(asn1sig).toHex();
 		// placeholderLength represents the length of the HEXified symbols but we're
 		// checking the actual lengths.
 		this.log("Size of signature is " + sighex.length + "/" + placeholderLength);
@@ -894,134 +934,128 @@ z.PdfSigner = class{
 
 	/**
 	 * @private
-	 * @param {string} str
-	 * @return {PDFLib.PDFString|PDFLib.PDFHexString}
-	 */
-	convToPDFString(str){
-		// Check if there is a multi-bytes char in the string.
-		/** @type {boolean} */
-		var flg = false;
-		for(var i=0; i<str.length; i++){
-			if(str.charCodeAt(i) > 0xFF){
-				flg = true;
-				break;
-			}
-		}
-		if(flg){
-			return PDFLib.PDFHexString.fromText(str);
-		}else{
-			return PDFLib.PDFString.of(str);
-		}
-	}
-
-	/**
-	 * @private
-	 * @param {string=} signature
-	 * @return {string}
-	 */
-	genTsrData(signature){
-		// Generate SHA256 hash from signature content for TSA
-		/** @type {forge.md.digest} */
-		var md = forge.md.sha256.create();
-		md.update(signature);
-		// Generate TSA request
-		/** @type {forge.asn1} */
-		var asn1Req = forge.asn1.create(
-			forge.asn1.Class.UNIVERSAL,
-			forge.asn1.Type.SEQUENCE,
-			true,
-			[
-				// Version
-				{
-					composed: false,
-					constructed: false,
-					tagClass: forge.asn1.Class.UNIVERSAL,
-					type: forge.asn1.Type.INTEGER,
-					value: forge.asn1.integerToDer(1).data,
-				},
-				{
-					composed: true,
-					constructed: true,
-					tagClass: forge.asn1.Class.UNIVERSAL,
-					type: forge.asn1.Type.SEQUENCE,
-					value: [
-						{
-							composed: true,
-							constructed: true,
-							tagClass: forge.asn1.Class.UNIVERSAL,
-							type: forge.asn1.Type.SEQUENCE,
-							value: [
-								{
-									composed: false,
-									constructed: false,
-									tagClass: forge.asn1.Class.UNIVERSAL,
-									type: forge.asn1.Type.OID,
-									value: forge.asn1.oidToDer(forge.oids.sha256).data,
-								}, {
-									composed: false,
-									constructed: false,
-									tagClass: forge.asn1.Class.UNIVERSAL,
-									type: forge.asn1.Type.NULL,
-									value: ""
-								}
-							]
-						}, {// Message imprint
-							composed: false,
-							constructed: false,
-							tagClass: forge.asn1.Class.UNIVERSAL,
-							type: forge.asn1.Type.OCTETSTRING,
-							value: md.digest().data,
-						}
-					]
-				}, {
-					composed: false,
-					constructed: false,
-					tagClass: forge.asn1.Class.UNIVERSAL,
-					type: forge.asn1.Type.BOOLEAN,
-					value: 1, // Get REQ certificates
-				}
-			]
-		);
-
-		return forge.asn1.toDer(asn1Req).data;
-	}
-
-	/**
-	 * @private
-	 * @param {string=} signature
+	 * @param {string=} data
+	 * @param {boolean=} nocert
 	 * @return {Promise<forge.asn1>}
 	 */
-	async queryTsa(signature){
+	async queryTsa(data, nocert){
 		/** @lends {forge.asn1} */
-		var asn1 = forge.asn1;
+		const asn1 = forge.asn1;
+		/** @lends {forge.asn1.Class} */
+		const asnc = asn1.Class;
+		/** @lends {forge.asn1.Type} */
+		const asnt = asn1.Type;
+
+		/**
+		 * @param {string|number|boolean|forge.asn1|Array<forge.asn1>} aval
+		 * @param {number=} atyp
+		 * @param {number=} atag
+		 * @return {forge.asn1}
+		 */
+		var asncreate = function(aval, atyp, atag){
+			/** @type {string|number|forge.asn1|Array<forge.asn1>} */
+			var a_val = null;
+			/** @type {number} */
+			var a_typ = (atyp || atyp === asnt.NONE) ? atyp : -1;
+			/** @type {boolean} */
+			var a_con = false;
+			if(Array.isArray(aval)){
+				a_con = true;
+			}else{
+				switch(typeof aval){
+				case "string":
+					if(a_typ == asnt.OID){
+						a_val = asn1.oidToDer(aval).getBytes();
+					}else if(a_typ < 0){
+						a_typ = asnt.OCTETSTRING;
+					}
+					break;
+				case "number":
+					a_val = asn1.integerToDer(aval).getBytes();
+					if(a_typ < 0){
+						a_typ = asnt.INTEGER;
+					}
+					break;
+				case "boolean":
+					if(aval){
+						a_val = 1;
+					}else{
+						a_val = 0;
+					}
+					if(a_typ < 0){
+						a_typ = asnt.BOOLEAN;
+					}
+				}
+			}
+			if(a_typ < 0){
+				a_typ = asnt.SEQUENCE;
+			}
+			if(!a_val && a_val !== 0){
+				a_val = /** @type {Array|forge.asn1|number|string} */(aval);
+			}
+			return asn1.create(atag ? atag : asnc.UNIVERSAL, a_typ, a_con, a_val);
+		};
+
+		// Generate SHA256 hash from data for TSA
+		/** @type {forge.md.digest} */
+		var md = forge.md.sha256.create();
+		md.update(data);
+
+		// Generate TSA request
+		/** @type {forge.asn1} */
+		var asn1Req = asncreate([
+			// Version
+			asncreate(1),
+			asncreate([
+				asncreate([
+					asncreate(forge.oids.sha256, asnt.OID),
+					asncreate("", asnt.NULL),
+				]),
+				// Message imprint
+				asncreate(md.digest().getBytes()),
+			]),
+			// Get REQ certificates
+			asncreate(true),
+		]);
 		/** @type {string} */
-		var tsr = this.genTsrData(signature);
+		var tsr = asn1.toDer(asn1Req).getBytes();
 		/** @type {Uint8Array} */
 		var tu8s = z.rawToU8arr(tsr);
+		/** @type {Object<string, *>} */
+		var hds = this.tsainf.headers ? this.tsainf.headers : {};
+		if(!hds["Content-Type"]){
+			hds["Content-Type"] = "application/timestamp-query";
+		}
 		/** @type {UrlFetchParams} */
 		var options = {
 			"method": "POST",
-			"headers": {"Content-Type": "application/timestamp-query"},
+			"headers": hds,
 			"payload": tu8s,
 		};
 		/** @type {Uint8Array} */
-		var tesp = await z.UrlFetchApp.fetch(this.tsainf.url, options);
+		var tesp = await z.urlFetch(this.tsainf.url, options);
 		/** @type {string} */
 		var tstr = z.u8arrToRaw(tesp);
 		/** @type {forge.asn1} */
 		var token = asn1.fromDer(tstr).value[1];
 
-		// create the asn1 to append to the signature
-		/** @type {string} *///forge.pki.oids.timeStampToken
-		var typstr = asn1.oidToDer("1.2.840.113549.1.9.16.2.14").getBytes();
-		return asn1.create(asn1.Class.CONTEXT_SPECIFIC, 1, true, [
-			asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SEQUENCE, true, [
-				// Attribute Type
-				asn1.create(asn1.Class.UNIVERSAL, asn1.Type.OID, false, typstr),
-				// Attribute Value
-				asn1.create(asn1.Class.UNIVERSAL, asn1.Type.SET, true, [token]),
-			]),
-		]);
+		/** @type {forge.asn1} */
+		var ret = null;
+		if(nocert){
+			ret = token;
+		}else{
+			// create the asn1 to append to the signature
+			ret = asncreate([
+				asncreate([
+					// Attribute Type (forge.pki.oids.timeStampToken)
+					asncreate("1.2.840.113549.1.9.16.2.14", asnt.OID),
+					// Attribute Value
+					asncreate([token], asnt.SET),
+				]),
+			], 1, asnc.CONTEXT_SPECIFIC);
+		}
+		this.log("Timestamp from " + this.tsainf.url + " has been obtained.");
+		return ret;
 	}
 
 	/**

@@ -3,6 +3,7 @@
  * {{
  *    url: string,
  *    len: (number|undefined),
+ *    headers: (Object<string, *>|undefined),
  * }}
  */
 var TsaServiceInfo;
@@ -32,6 +33,8 @@ var SignAreaInfo;
  */
 var SignDrawInfo;
 /**
+ * In the case of adding a document timestamp, the p12cert and pwd must be omitted. But meanwhile the tsa must be provided.
+ *
  * permission: (DocMDP) The modification permissions granted for this document. Valid values are:
  *  1 : No changes to the document are permitted; any change to the document invalidates the signature.
  *  2 : Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.
@@ -39,8 +42,8 @@ var SignDrawInfo;
  *
  * @typedef
  * {{
- *    p12cert: (Array<number>|Uint8Array|ArrayBuffer|string),
- *    pwd: string,
+ *    p12cert: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    pwd: (string|undefined),
  *    permission: (number|undefined),
  *    reason: (string|undefined),
  *    location: (string|undefined),

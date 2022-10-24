@@ -11,13 +11,12 @@ globalThis.forge = require("node-forge");
 require("./zgapdfcryptor.js");
 require("./zgapdfsigner.js");
 
-Zga.UrlFetchApp = {};
 /**
  * @param {string} url
  * @param {UrlFetchParams} params
  * @return {Promise<Uint8Array>}
  */
-Zga.UrlFetchApp.fetch = function(url, params){
+Zga.urlFetch = function(url, params){
 	return new Promise(function(resolve, reject){
 		/** @type {URL} */
 		var opts = m_urlparser.parse(url);
@@ -91,13 +90,17 @@ async function main(){
 	}
 
 	if(!ps){
-		throw new Error("The passphrase is not specified.");
+		// throw new Error("The passphrase is not specified.");
+		pfxPath = "";
 	}
 
 	/** @type {Buffer} */
 	var pdf = m_fs.readFileSync(pdfPath);
 	/** @type {Buffer} */
-	var pfx = m_fs.readFileSync(pfxPath);
+	var pfx = null;
+	if(pfxPath){
+		pfx = m_fs.readFileSync(pfxPath);
+	}
 	/** @type {Buffer} */
 	var img = null;
 	/** @type {string} */
@@ -109,11 +112,11 @@ async function main(){
 
 	/** @type {SignOption} */
 	var sopt = null;
-	if(pfx){
+	if(pdf){
 		sopt = {
 			p12cert: pfx,
 			pwd: ps,
-			permission: 1,
+			permission: pfx ? 1 : 0,
 			signdate: "1",
 			reason: "I have a test reason.",
 			location: "I am on the earth.",

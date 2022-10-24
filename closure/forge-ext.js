@@ -102,6 +102,8 @@ forge.asn1.integerToDer = function(num){};
 forge.asn1.oidToDer = function(oid){};
 forge.asn1.Type = {};
 /** @type {number} */
+forge.asn1.Type.NONE;
+/** @type {number} */
 forge.asn1.Type.UTF8;
 /** @type {number} */
 forge.asn1.Type.SET;
@@ -126,7 +128,7 @@ forge.asn1.Class.CONTEXT_SPECIFIC;
  * @param {number} tagClass
  * @param {number} type
  * @param {boolean} constructed
- * @param {Array<string>|string} value
+ * @param {Array<forge.asn1>|forge.asn1|number|string} value
  * @param {Object=} options
  * @return {forge.asn1}
  */
