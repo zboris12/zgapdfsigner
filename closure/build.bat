@@ -5,12 +5,12 @@ doskey csr=%csr% $*
 set externs=--externs closure\google-ext.js --externs closure\forge-ext.js --externs closure\pdflib-ext.js --externs closure\zb-externs.js
 
 rem main
-set src=.
-set jss=--js %src%\zgapdfcryptor.js --js %src%\zgapdfsigner.js
+set src=lib
+set jss=--js %src%\zgacertsutil.js --js %src%\zgapdfcryptor.js --js %src%\zgapdfsigner.js --js %src%\zgaindex.js
 echo $
 set chkj=%%externs%% --checks_only %%jss%%
 echo chkj=csr %chkj%
 doskey chkj=%csr% %chkj%
-set csrj=%%externs%% %%jss%% --js_output_file %src%\dist\zgapdfsigner.min.js
+set csrj=%%externs%% %%jss%% --js_output_file dist\zgapdfsigner.min.js
 echo csrj=csr %csrj%
 doskey csrj=%csr% %csrj%

@@ -34,11 +34,15 @@ var SignAreaInfo;
 var SignDrawInfo;
 /**
  * In the case of adding a document timestamp, the p12cert and pwd must be omitted. But meanwhile the tsa must be provided.
- *
+ * 
  * permission: (DocMDP) The modification permissions granted for this document. Valid values are:
  *  1 : No changes to the document are permitted; any change to the document invalidates the signature.
  *  2 : Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.
  *  3 : Permitted changes are the same as for 2, as well as annotation creation, deletion, and modification; other changes invalidate the signature.
+ *
+ * ltv: Type of Long-Term Validation. Valid values are:
+ *  1 : auto; Try using ocsp only to enable the LTV first; If can't, try using crl to enable the LTV.
+ *  2 : crl only; Only try using crl to enable the LTV.
  *
  * @typedef
  * {{
@@ -51,6 +55,7 @@ var SignDrawInfo;
  *    signdate: (Date|TsaServiceInfo|string|undefined),
  *    signame: (string|undefined),
  *    drawinf: (SignDrawInfo|undefined),
+ *    ltv: (number|undefined),
  *    debug: (boolean|undefined),
  * }}
  */
@@ -110,6 +115,23 @@ var CFType;
  * }}
  */
 var RC4LastInfo;
+/**
+ * @typedef
+ * {{
+ *    certs: (Array<forge_cert>|undefined),
+ *    ocsps: (Array<Uint8Array>|undefined),
+ *    crls: (Array<Uint8Array>|undefined),
+ * }}
+ */
+var DSSInfo;
+/**
+ * @typedef
+ * {{
+ *    resp: (Uint8Array|undefined),
+ *    cchainIdx: (number|undefined),
+ * }}
+ */
+var OcspData;
 
 var Zga = {};
 /**
@@ -142,6 +164,55 @@ Zga.PdfCryptor = function(encopt){};
  * @return {Promise<PDFLib.PDFDocument>}
  */
 Zga.PdfCryptor.prototype.encryptPdf = function(pdf, ref){};
+/**
+ * @constructor
+ * @param {Array<forge_cert|forge.asn1|string>=} certs
+ */
+Zga.CertsChain = function(certs){};
+/**
+ * @return {forge_cert}
+ */
+Zga.CertsChain.prototype.getSignCert = function(){};
+/**
+ * @public
+ * @return {boolean}
+ */
+Zga.CertsChain.prototype.isSelfSignedCert = function(){};
+/**
+ * @return {Array<forge_cert>}
+ */
+Zga.CertsChain.prototype.getAllCerts = function(){};
+/**
+ * @public
+ * @param {forge_cert} cert
+ * @return {Promise<boolean>}
+ */
+Zga.CertsChain.prototype.buildChain = function(cert){};
+/**
+ * @param {boolean=} crlOnly
+ * @return {Promise<DSSInfo>}
+ */
+Zga.CertsChain.prototype.prepareDSSInf = function(crlOnly){};
+/**
+ * @constructor
+ * @param {TsaServiceInfo} inf
+ */
+Zga.TsaFetcher = function(inf){};
+/**
+ * @param {string=} data
+ * @return {Promise<string>}
+ */
+Zga.TsaFetcher.prototype.queryTsa = function(data){};
+/**
+ * @param {boolean=} forP7
+ * @return {forge.asn1}
+ */
+Zga.TsaFetcher.prototype.getToken = function(forP7){};
+/**
+ * @return {Zga.CertsChain}
+ */
+Zga.TsaFetcher.prototype.getCertsChain = function(){};
+
 /**
  * @constructor
  * @param {SignOption} signopt

@@ -67,6 +67,13 @@ forge.util.hexToBytes = function(hex){};
  * @return {string}
  */
 forge.util.decodeUtf8 = function(value){};
+forge.util.binary = {};
+forge.util.binary.hex = {};
+/**
+ * @param {string} str
+ * @return {Uint8Array}
+ */
+forge.util.binary.hex.decode = function(str){};
 
 /** @constructor */
 forge.asn1 = function(){};
@@ -119,6 +126,12 @@ forge.asn1.Type.OID;
 forge.asn1.Type.NULL;
 /** @type {number} */
 forge.asn1.Type.OCTETSTRING;
+/** @type {number} */
+forge.asn1.Type.PRINTABLESTRING;
+/** @type {number} */
+forge.asn1.Type.ENUMERATED;
+/** @type {number} */
+forge.asn1.Type.BITSTRING;
 forge.asn1.Class = {};
 /** @type {number} */
 forge.asn1.Class.UNIVERSAL;
@@ -133,8 +146,21 @@ forge.asn1.Class.CONTEXT_SPECIFIC;
  * @return {forge.asn1}
  */
 forge.asn1.create = function(tagClass, type, constructed, value, options){};
-/** @type {Array<forge.asn1>} */
+/**
+ * @param {forge.asn1} obj
+ * @param {Object<string, *>} v
+ * @param {Object<string, *>} capture
+ * @param {Array<string>} errors
+ */
+forge.asn1.validate = function(obj, v, capture, errors){};
+/** @type {Array<forge.asn1>|string} */
 forge.asn1.prototype.value;
+/** @type {number} */
+forge.asn1.prototype.tagClass;
+/** @type {number} */
+forge.asn1.prototype.type;
+/** @type {boolean} */
+forge.asn1.prototype.constructed;
 
 /** @constructor */
 const forge_BigInteger = function(){};
@@ -149,6 +175,20 @@ const forge_cert = function(){};
 forge_cert.prototype.publicKey;
 /** @type {forge_cert_issuer} */
 forge_cert.prototype.issuer;
+/** @type {string} */
+forge_cert.prototype.serialNumber;
+/** @type {forge_cert_issuer} */
+forge_cert.prototype.subject;
+/**
+ * @param {forge_cert} parent
+ * @return {boolean}
+ */
+forge_cert.prototype.isIssuer = function(parent){};
+/**
+ * @param {string|forge_cert_extension} nm
+ * @return {forge_cert_extension}
+ */
+forge_cert.prototype.getExtension = function(nm){};
 /** @constructor */
 const forge_key = function(){};
 /** @type {forge_BigInteger} */
@@ -159,6 +199,23 @@ forge_key.prototype.e;
 const forge_cert_issuer = function(){};
 /** @type {Array<forge_cert_attr>} */
 forge_cert_issuer.prototype.attributes;
+/**
+ * @param {string} sn
+ * @return {forge.asn1}
+ */
+forge_cert_issuer.prototype.getField = function(sn){};
+/**
+ * @typedef
+ * {{
+ *    id: (string|undefined),
+ *    name: (string|undefined),
+ *    critical: (boolean|undefined),
+ *    value: (string|undefined),
+ *    cA: (boolean|undefined),
+ * }}
+ */
+var forge_cert_extension;
+
 /**
  * @typedef
  * {{
@@ -263,15 +320,14 @@ var P12Bag;
  */
 forge.pkcs12.prototype.getBags = function(filter){};
 
-forge.oids = {};
-/** @type {string} */
-forge.oids.sha256;
 forge.pki = {};
 forge.pki.oids = {};
 /** @type {string} */
 forge.pki.oids.certBag;
 /** @type {string} */
 forge.pki.oids.pkcs8ShroudedKeyBag;
+/** @type {string} */
+forge.pki.oids.sha1;
 /** @type {string} */
 forge.pki.oids.sha256;
 /** @type {string} */
@@ -282,12 +338,35 @@ forge.pki.oids.data;
 forge.pki.oids.messageDigest;
 /** @type {string} */
 forge.pki.oids.signingTime;
+/** @type {string} */
+forge.pki.oids.rsaEncryption;
+/** @type {string} */
+forge.pki.oids.sha256WithRSAEncryption;
+/** @type {string} */
+forge.pki.oids.commonName;
+/** @lends {forge.pki.oids} */
+forge.oids = forge.pki.oids;
 /**
  * @param {forge.asn1} obj
  * @param {boolean=} computeHash
  * @return {forge_cert}
  */
 forge.pki.certificateFromAsn1 = function(obj, computeHash){};
+/**
+ * @param {forge_cert} cert
+ * @return {forge.asn1}
+ */
+forge.pki.certificateToAsn1 = function(cert){};
+/**
+ * @param {forge_cert_issuer} obj
+ * @return {forge.asn1}
+ */
+forge.pki.distinguishedNameToAsn1 = function(obj){};
+/**
+ * @param {forge_key} key
+ * @return {forge.asn1}
+ */
+forge.pki.publicKeyToRSAPublicKey = function(key){};
 
 forge.md = {};
 /** @constructor */

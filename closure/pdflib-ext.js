@@ -108,7 +108,10 @@ PDFLib.PDFAcroForm.prototype.addField = function(field){};
 /** @type {PDFLib.PDFDict} */
 PDFLib.PDFAcroForm.prototype.dict;
 
-/** @constructor */
+/**
+ * @constructor
+ * @extends {PDFLib.PDFDict}
+ */
 PDFLib.PDFCatalog = function(){};
 /**
  * @param {PDFLib.PDFName} name
@@ -196,6 +199,7 @@ PDFLib.PDFContext.prototype.enumerateIndirectObjects = function(){};
  * @typedef
  * {{
  *    Root: PDFLib.PDFRef,
+ *    Info: PDFLib.PDFRef,
  *    ID: (PDFLib.PDFArray|undefined),
  * }}
  */
@@ -221,6 +225,12 @@ PDFLib.PDFContext.prototype.nextRef = function(){};
  * @return {PDFLib.PDFObject}
  */
 PDFLib.PDFContext.prototype.obj = function(literal){};
+/**
+ * @param {string|Uint8Array} contents
+ * @param {PDFLib.PDFDict=} dict
+ * @return {PDFLib.PDFRawStream}
+ */
+PDFLib.PDFContext.prototype.flateStream = function(contents, dict){};
 /**
  * @param {PDFLib.PDFRef} ref
  * @return {PDFLib.PDFObject}
@@ -425,6 +435,11 @@ PDFLib.PDFContentStream = function(){};
  * @return {PDFLib.PDFContentStream}
  */
 PDFLib.PDFContentStream.of = function(dict, operators, encode){};
+/**
+ * @constructor
+ * @extends {PDFLib.PDFStream}
+ */
+PDFLib.PDFRawStream = function(){};
 
 /**
  * @constructor
