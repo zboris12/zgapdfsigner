@@ -4,6 +4,111 @@ const Zga = require("./lib/zganode.js");
 
 const workpath = "test/";
 
+/**
+ * @param {string} pdfPath
+ * @param {string} pfxPath
+ * @param {string} ps
+ * @param {number} perm
+ * @param {string=} imgPath
+ * @return {Promise<string>} output path
+ */
+async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
+	/** @type {Buffer} */
+	var pdf = m_fs.readFileSync(pdfPath);
+	/** @type {Buffer} */
+	var pfx = m_fs.readFileSync(pfxPath);
+	/** @type {Buffer} */
+	var img = null;
+	/** @type {string} */
+	var imgType = "";
+
+	if(perm == 1){
+		console.log("\nTest signing pdf with full protection. (permission 1 and password encryption)");
+	}else{
+		console.log("\nTest signing pdf with permission "+perm);
+	}
+
+	if(imgPath){
+		img = m_fs.readFileSync(imgPath);
+		imgType = m_path.extname(imgPath).slice(1);
+	}
+	/** @type {SignOption} */
+	var sopt = {
+		p12cert: pfx,
+		pwd: ps,
+		permission: perm,
+		signdate: "1",
+		reason: "I have a test reason "+perm+".",
+		location: "I am on the earth "+perm+".",
+		contact: "zga"+perm+"@zga.com",
+		ltv: 1,
+		debug: true,
+	};
+	if(img){
+		sopt.drawinf = {
+			area: {
+				x: 25, // left
+				y: 150, // top
+				w: 60,
+				h: 60,
+			},
+			imgData: img,
+			imgType: imgType,
+		};
+	}
+
+	/** @type {EncryptOption} */
+	var eopt = undefined;
+	if(perm == 1){
+		eopt = {
+			mode: Zga.Crypto.Mode.AES_256,
+			permissions: ["copy", "copy-extract", "print-high"],
+			userpwd: "123",
+		};
+	}
+
+	/** @type {Zga.PdfSigner} */
+	var ser = new Zga.PdfSigner(sopt);
+	/** @type {Uint8Array} */
+	var u8dat = await ser.sign(pdf, eopt);
+	if(u8dat){
+		/** @type {string} */
+		var outPath = m_path.join(__dirname, workpath+"test_perm"+perm+".pdf");
+		m_fs.writeFileSync(outPath, u8dat);
+		console.log("Output file: " + outPath);
+	}
+	return outPath;
+}
+
+/**
+ * @param {string} pdfPath
+ * @return {Promise<string>} output path
+ */
+async function addtsa(pdfPath){
+	console.log("\nTest signing pdf by a timestamp.");
+
+	/** @type {Buffer} */
+	var pdf = m_fs.readFileSync(pdfPath);
+	/** @type {SignOption} */
+	var sopt = {
+		signdate: "2",
+		reason: "I have a test reason tsa.",
+		location: "I am on the earth tsa.",
+		contact: "zgatsa@zga.com",
+		ltv: 1,
+		debug: true,
+	};
+	/** @type {Zga.PdfSigner} */
+	var ser = new Zga.PdfSigner(sopt);
+	/** @type {Uint8Array} */
+	var u8dat = await ser.sign(pdf);
+	/** @type {string} */
+	var outPath = m_path.join(__dirname, workpath+"test_tsa.pdf");
+	m_fs.writeFileSync(outPath, u8dat);
+	console.log("Output file: " + outPath);
+	return outPath;
+}
+
 async function main(){
 	/** @type {string} */
 	var pdfPath = m_path.join(__dirname, workpath+"_test.pdf");
@@ -26,101 +131,15 @@ async function main(){
 		pfxPath = "";
 	}
 
-	/** @type {Buffer} */
-	var pdf = m_fs.readFileSync(pdfPath);
-	/** @type {Buffer} */
-	var pfx = null;
 	if(pfxPath){
-		pfx = m_fs.readFileSync(pfxPath);
-	}
-	/** @type {Buffer} */
-	var img = null;
-	/** @type {string} */
-	var imgType = "";
-	if(imgPath){
-		img = m_fs.readFileSync(imgPath);
-		imgType = m_path.extname(imgPath).slice(1);
+		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath);
+		pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath);
+		await addtsa(pdfPath);
+	}else{
+		await addtsa(pdfPath);
 	}
 
-	/** @type {SignOption} */
-	var sopt = null;
-	if(pdf){
-		sopt = {
-			p12cert: pfx,
-			pwd: ps,
-			// permission: pfx ? 2 : 0,
-			signdate: "1",
-			reason: "I have a test reason.",
-			location: "I am on the earth.",
-			contact: "zga@zga.com",
-			ltv: 1,
-			debug: true,
-		};
-		if(img){
-			sopt.drawinf = {
-				area: {
-					x: 25, // left
-					y: 150, // top
-					w: 60,
-					h: 60,
-				},
-//				pageidx: 2,
-				imgData: img,
-				imgType: imgType,
-			};
-		}
-	}
-
-	/** @type {EncryptOption} */
-	var eopt = undefined;
-	eopt = {
-		mode: Zga.Crypto.Mode.AES_256,
-		permissions: ["copy", "copy-extract", "print-high"],
-		userpwd: "123",
-	};
-	// eopt.pubkeys = [];
-
-	/** @type {Uint8Array} */
-	var u8dat = null;
-	if(sopt){
-		/** @type {Zga.PdfSigner} */
-		var ser = new Zga.PdfSigner(sopt);
-		u8dat = await ser.sign(pdf, eopt);
-	}
-
-	if(u8dat){
-		/** @type {string} */
-		var outPath = m_path.join(__dirname, workpath+"test_signed.pdf");
-		m_fs.writeFileSync(outPath, u8dat);
-		console.log("Output file: " + outPath);
-	}
 	console.log("Done");
 }
 
-async function main2(){
-	/** @type {string} */
-	var pdfPath = m_path.join(__dirname, workpath+"test_signed.pdf");
-	/** @type {Buffer} */
-	var pdf = m_fs.readFileSync(pdfPath);
-	/** @type {SignOption} */
-	var sopt = {
-		signdate: "2",
-		reason: "I have a test reason.",
-		location: "I am on the earth.",
-		contact: "zga@zga.com",
-		ltv: 1,
-		debug: true,
-	};
-	/** @type {Zga.PdfSigner} */
-	var ser = new Zga.PdfSigner(sopt);
-	/** @type {Uint8Array} */
-	var u8dat = await ser.sign(pdf);
-	/** @type {string} */
-	var outPath = m_path.join(__dirname, workpath+"test_signed_tsa.pdf");
-	m_fs.writeFileSync(outPath, u8dat);
-	console.log("Output file: " + outPath);
-	return;
-}
-
 main();
-// main2();

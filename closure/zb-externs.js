@@ -165,6 +165,11 @@ Zga.PdfCryptor = function(encopt){};
  */
 Zga.PdfCryptor.prototype.encryptPdf = function(pdf, ref){};
 /**
+ * @param {number} num
+ * @param {PDFLib.PDFObject} val
+ */
+Zga.PdfCryptor.prototype.encryptObject = function(num, val){};
+/**
  * @constructor
  * @param {Array<forge_cert|forge.asn1|string>=} certs
  */
@@ -198,6 +203,10 @@ Zga.CertsChain.prototype.prepareDSSInf = function(crlOnly){};
  * @param {TsaServiceInfo} inf
  */
 Zga.TsaFetcher = function(inf){};
+/** @type {string} */
+Zga.TsaFetcher.prototype.url;
+/** @type {number} */
+Zga.TsaFetcher.prototype.len;
 /**
  * @param {string=} data
  * @return {Promise<string>}
