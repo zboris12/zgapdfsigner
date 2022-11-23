@@ -11,11 +11,11 @@ And I use this name to hope the merits from this application will be dedicated t
 
 * Sign a pdf with an invisible pkcs#7 signature.
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
-* Sign a pdf and set [DocMDP](#note).
+* Sign a pdf and set [DocMDP](wiki/API#note).
 * Add a new signature to a pdf if it has been signed already. (An incremental update)
-* Add a document timestamp from [TSA](#note). (__Not__ available in web browser)
-* Sign a pdf with a timestamp from [TSA](#note). ((__Not__ available in web browser)
-* Enable signature's [LTV](#note). (__Not__ available in web browser)
+* Add a document timestamp from [TSA](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Sign a pdf with a timestamp from [TSA](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Enable signature's [LTV](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
   * 128bit RC4 Encryption
@@ -24,10 +24,10 @@ And I use this name to hope the merits from this application will be dedicated t
 * Set public-key certificate protection to a pdf.
   Supported algorithms are as same as the password protection.
 
-## About signing with [TSA](#note) and [LTV](#note)
+## About signing with [TSA](wiki/API#note) and [LTV](wiki/API#note)
 
-Because of the [CORS](#note) security restrictions in web browser,
-signing with a timestamp from [TSA](#note) or enabling [LTV](#note) can only be used in [Google Apps Script](https://developers.google.com/apps-script) or [nodejs](https://nodejs.org/).
+Because of the [CORS](wiki/API#note) security restrictions in web browser,
+signing with a timestamp from [TSA](wiki/API#note) or enabling [LTV](wiki/API#note) can only be used in [Google Apps Script](https://developers.google.com/apps-script) or [nodejs](https://nodejs.org/).
 
 ## The Dependencies
 
@@ -261,48 +261,7 @@ async function main(){
 }
 ```
 
-## Detail of SignOption
-
-* __p12cert__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) Certificate's data. In the case of adding a document timestamp, it must be omitted.
-* __pwd__: string :point_right: (Optional) The passphrase of the certificate. In the case of adding a document timestamp, it must be omitted.
-* __permission__: number :point_right: (Optional) The modification permissions granted for this document.
-  This is a setting of [DocMDP](#note). Valid values are:
-  * 1: No changes to the document are permitted; any change to the document invalidates the signature.
-  * 2: Permitted changes are filling in forms, instantiating page templates, and signing; other changes invalidate the signature.
-  * 3: Permitted changes are the same as for 2, as well as annotation creation, deletion, and modification; other changes invalidate the signature.
-* __reason__: string :point_right: (Optional) The reason for signing
-* __location__: string :point_right: (Optional) Your location
-* __contact__: string :point_right: (Optional) Your contact information
-* __signdate__: Date|string|_TsaServiceInfo_ :point_right: (Optional) In the case of adding a document timestamp, it can't be omitted and can't be a Date.
-  * When it is a Date, it means the date and time of signing.
-  * When it is a string, it can be an url of [TSA](#note) or an index of the preset [TSA](#note)s as below:
-    * "1": http://ts.ssl.com
-    * "2": http://timestamp.digicert.com
-    * "3": http://timestamp.sectigo.com
-    * "4": http://timestamp.entrust.net/TSS/RFC3161sha2TS
-    * "5": http://timestamp.apple.com/ts01
-    * "6": http://www.langedge.jp/tsa
-    * "7": https://freetsa.org/tsr
-  * When it is a _TsaServiceInfo_, it means a full customized information of a [TSA](#note).
-    * __url__: string :point_right: The url of [TSA](#note)
-    * __len__: number :point_right: (Optional) The length of signature's placeholder
-    * __headers__: Object<string, *> :point_right: (Optional) The customized headers for sending to [TSA](#note) server
-  * When it is omitted, the system timestamp will be used.
-* __signame__: string :point_right: (Optional) The name of the signature
-* __ltv__: number :point_right: (Optional) Type of [LTV](#note). Valid values are:
-  * 1: auto; Try using [OCSP](#note) only to enable the [LTV](#note) first; If can't, try using [CRL](#note) to enable the [LTV](#note).
-  * 2: crl only; Only try using [CRL](#note) to enable the [LTV](#note).
-* __drawinf__: _SignDrawInfo_ :point_right: (Optional) Visible signature's information
-  * __area__: _SignAreaInfo_ :point_right: The signature's drawing area, these numbers are dots on 72dpi.
-    * __x__: number :point_right: Distance from left
-    * __y__: number :point_right: Distance from top
-    * __w__: number :point_right: Width
-    * __h__: number :point_right: Height
-  * __pageidx__: number :point_right: (Optional) The index of a page where the signature will be drawn.
-  * __imgData__: Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The image's data
-  * __imgType__: string :point_right: (Optional) The image's type, <ins>only support jpg and png</ins>
-  * __text__: string :point_right: (Optional) A text drawing for the signature, <ins>not implemented yet</ins>
-  * __fontData__: PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string :point_right: (Optional) The font's data for drawing text, <ins>not implemented yet</ins>
+:question: For more details please see the [wiki](wiki/API).
 
 ## Let's protect the pdf
 
@@ -409,29 +368,7 @@ async function signAndProtect2(pdf, cert, pwd){
 }
 ```
 
-## Detail of EncryptOption
-
-* __mode__: Zga.Crypto.Mode :point_right: The values of Zga.Crypto.Mode
-  * RC4_40: 40bit RC4 Encryption
-  * RC4_128: 128bit RC4 Encryption
-  * AES_128: 128bit AES Encryption
-  * AES_256: 256bit AES Encryption
-* __permissions__: Array<string> :point_right: (Optional) The set of permissions to be blocked
-  * "copy": (Only valid on public-key mode) Copy text and graphics from the document;
-  * "print": Print the document;
-  * "modify": Modify the contents of the document by operations other than those controlled by 'fill-forms', 'extract' and 'assemble';
-  * "copy-extract": Copy or otherwise extract text and graphics from the document;
-  * "annot-forms": Add or modify text annotations, fill in interactive form fields, and, if 'modify' is also set, create or modify interactive form fields (including signature fields);
-  * "fill-forms": Fill in existing interactive form fields (including signature fields), even if 'annot-forms' is not specified;
-  * "extract": Extract text and graphics (in support of accessibility to users with disabilities or for other purposes);
-  * "assemble": Assemble the document (insert, rotate, or delete pages and create bookmarks or thumbnail images), even if 'modify' is not set;
-  * "print-high": Print the document to a representation from which a faithful digital copy of the PDF content could be generated. When this is not set, printing is limited to a low-level representation of the appearance, possibly of degraded quality.
-* __userpwd__: string :point_right: (Optional) User password. Used when opening the pdf.
-* __ownerpwd__: string :point_right: (Optional) Owner password. If not specified, a random value is used.
-* __pubkeys__: Array<_PubKeyInfo_> :point_right: (Optional) Array of recipients containing public-key certificates ('c') and permissions ('p').
-  * __c__: Array<number>|Uint8Array|ArrayBuffer|string|forge_cert :point_right: (Optional) A public-key certificate.
-           Only when you want to encrypt the pdf by the certificate used in signing, the c can be omitted.
-  * __p__: Array<string> :point_right: (Optional) Permissions
+:question: For more details please see the [wiki](wiki/API).
 
 ## Thanks
 * The module of setting protection was almost migrated from [TCPDF](http://www.tcpdf.org).
@@ -440,11 +377,3 @@ async function signAndProtect2(pdf, cert, pwd){
 
 This tool is available under the
 [MIT license](https://opensource.org/licenses/MIT).
-
-## Note
-* __CORS__: Cross-Origin Resource Sharing
-* __CRL__: Certificate Revocation Lists
-* __DocMDP__: Document Modification Detection and Prevention
-* __LTV__: Long-Term Validation
-* __OCSP__: Online Certificate Status Protocol
-* __TSA__: Time Stamp Authority
