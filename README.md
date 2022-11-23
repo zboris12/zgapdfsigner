@@ -11,11 +11,11 @@ And I use this name to hope the merits from this application will be dedicated t
 
 * Sign a pdf with an invisible pkcs#7 signature.
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
-* Sign a pdf and set [DocMDP](wiki/API#note).
+* Sign a pdf and set [DocMDP](https://github.com/zboris12/zgapdfsigner/wiki/API#note).
 * Add a new signature to a pdf if it has been signed already. (An incremental update)
-* Add a document timestamp from [TSA](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
-* Sign a pdf with a timestamp from [TSA](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
-* Enable signature's [LTV](wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Add a document timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Sign a pdf with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Enable signature's [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
   * 128bit RC4 Encryption
@@ -24,10 +24,10 @@ And I use this name to hope the merits from this application will be dedicated t
 * Set public-key certificate protection to a pdf.
   Supported algorithms are as same as the password protection.
 
-## About signing with [TSA](wiki/API#note) and [LTV](wiki/API#note)
+## About signing with [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note) and [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note)
 
-Because of the [CORS](wiki/API#note) security restrictions in web browser,
-signing with a timestamp from [TSA](wiki/API#note) or enabling [LTV](wiki/API#note) can only be used in [Google Apps Script](https://developers.google.com/apps-script) or [nodejs](https://nodejs.org/).
+Because of the [CORS](https://github.com/zboris12/zgapdfsigner/wiki/API#note) security restrictions in web browser,
+signing with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note) or enabling [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note) can only be used in [Google Apps Script](https://developers.google.com/apps-script) or [nodejs](https://nodejs.org/).
 
 ## The Dependencies
 
@@ -261,7 +261,7 @@ async function main(){
 }
 ```
 
-:question: For more details please see the [wiki](wiki/API).
+:question: For more details please see the [wiki](https://github.com/zboris12/zgapdfsigner/wiki/API).
 
 ## Let's protect the pdf
 
@@ -368,7 +368,7 @@ async function signAndProtect2(pdf, cert, pwd){
 }
 ```
 
-:question: For more details please see the [wiki](wiki/API).
+:question: For more details please see the [wiki](https://github.com/zboris12/zgapdfsigner/wiki/API).
 
 ## Thanks
 * The module of setting protection was almost migrated from [TCPDF](http://www.tcpdf.org).
