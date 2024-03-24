@@ -1,5 +1,7 @@
 <div align="center"><img src="logo.png" title="zgapdfsigner"></div>
 
+![version](https://img.shields.io/github/package-json/v/zboris12/zgapdfsigner)
+![license](https://img.shields.io/github/license/zboris12/zgapdfsigner)
 ![build status](https://github.com/zboris12/zgapdfsigner/actions/workflows/build.yml/badge.svg)
 
 # ZgaPdfSigner
