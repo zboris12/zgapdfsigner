@@ -43,6 +43,8 @@ zgaindex.js
 		echo "google-closure-compiler failed."
 		exit 20
 	fi
+	echo "Build result:"
+	ls -l ${OUTFLDR}/zgapdfsigner.min.js
 	exit 0
 }
 exit $?
