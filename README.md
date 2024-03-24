@@ -1,5 +1,7 @@
 <div align="center"><img src="logo.png" title="zgapdfsigner"></div>
 
+![build status](https://github.com/zboris12/zgapdfsigner/actions/workflows/build.yml/badge.svg)
+
 # ZgaPdfSigner
 A javascript tool to sign a pdf or set protection of a pdf in web browser.  
 And it is more powerful when used in [Google Apps Script](https://developers.google.com/apps-script) or [nodejs](https://nodejs.org/).  
