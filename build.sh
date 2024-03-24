@@ -38,8 +38,11 @@ zgapdfsigner.js
 zgaindex.js
 EOF
 npx google-closure-compiler ${GCCOPT} ${GCCEXT} ${jss} --js_output_file ${OUTFLDR}/zgapdfsigner.min.js
-if [ $? -ne 0 ]
+if [ $? -eq 0 ]
 then
+	echo "Build result:"
+	ls -l ${OUTFLDR}/*.min.js
+else
 	echo "google-closure-compiler failed."
 	exit 20
 fi
