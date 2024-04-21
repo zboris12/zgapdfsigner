@@ -37,8 +37,11 @@ signing with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wik
 
 * [pdf-lib](https://pdf-lib.js.org/)
 * [node-forge](https://github.com/digitalbazaar/forge)
+* [follow-redirects](https://github.com/follow-redirects/follow-redirects)
 
 ## How to use this tool
+
+:question: For more details please see the [wiki](https://github.com/zboris12/zgapdfsigner/wiki/API).
 
 ### Web Browser
 Just import the dependencies and this tool.
@@ -265,8 +268,6 @@ async function main(){
 }
 ```
 
-:question: For more details please see the [wiki](https://github.com/zboris12/zgapdfsigner/wiki/API).
-
 ## Let's protect the pdf
 
 Set password protection to the pdf.
@@ -371,8 +372,6 @@ async function signAndProtect2(pdf, cert, pwd){
   return new Blob([u8arr], {"type" : "application/pdf"});
 }
 ```
-
-:question: For more details please see the [wiki](https://github.com/zboris12/zgapdfsigner/wiki/API).
 
 ## Thanks
 * The module of setting protection was almost migrated from [TCPDF](http://www.tcpdf.org).
