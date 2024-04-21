@@ -17,9 +17,9 @@ And I use this name to hope the merits from this application will be dedicated t
 * Sign a pdf with a visible pkcs#7 signature by drawing an image.
 * Sign a pdf and set [DocMDP](https://github.com/zboris12/zgapdfsigner/wiki/API#note).
 * Add a new signature to a pdf if it has been signed already. (An incremental update)
-* Add a document timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
-* Sign a pdf with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
-* Enable signature's [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note). (:no_entry_sign:__Not__ available in web browser)
+* Add a document timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser)
+* Sign a pdf with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser)
+* Enable signature's [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser)
 * Set password protection to a pdf. Supported algorithms:
   * 40bit RC4 Encryption
   * 128bit RC4 Encryption
