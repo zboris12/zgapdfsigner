@@ -48,7 +48,7 @@ Just import the dependencies and this tool.
 ```html
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js" type="text/javascript"></script>
 <script src="https://unpkg.com/node-forge@1.3.1/dist/forge.min.js" type="text/javascript"></script>
-<script src="https://github.com/zboris12/zgapdfsigner/releases/download/2.5.0/zgapdfsigner.min.js" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/zgapdfsigner/dist/zgapdfsigner.min.js" type="text/javascript"></script>
 ```
 
 ### [Google Apps Script](https://developers.google.com/apps-script)
@@ -66,9 +66,9 @@ eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").g
 // Load node-forge
 eval(UrlFetchApp.fetch("https://unpkg.com/node-forge@1.3.1/dist/forge.min.js").getContentText());
 // Load ZgaPdfSigner
-eval(UrlFetchApp.fetch("https://github.com/zboris12/zgapdfsigner/releases/download/2.5.0/zgapdfsigner.min.js").getContentText());
+eval(UrlFetchApp.fetch("https://cdn.jsdelivr.net/npm/zgapdfsigner/dist/zgapdfsigner.min.js").getContentText());
 ```
-Or simply import the library of [ZgaPdfToolkit](https://script.google.com/macros/library/d/1T0UPf50gGp2fJ4dR1rZfEFgKYC5VpCwUVooCRNySiL7klvIUVsFBCZ9m/5)
+Or simply import the library of [ZgaPdfToolkit](https://script.google.com/macros/library/d/1T0UPf50gGp2fJ4dR1rZfEFgKYC5VpCwUVooCRNySiL7klvIUVsFBCZ9m/7)
 1. Add the library of ZgaPdfToolkit to your project, and suppose the id of library you defined is "pdfkit".  
    Script id: `1T0UPf50gGp2fJ4dR1rZfEFgKYC5VpCwUVooCRNySiL7klvIUVsFBCZ9m`
 2. Load the library.
