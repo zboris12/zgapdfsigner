@@ -60,6 +60,28 @@ PDFLib.PDFDocument.prototype.embedPng = function(png){};
  * @returns {Promise<PDFLib.PDFImage>}
  */
 PDFLib.PDFDocument.prototype.embedJpg = function(jpg){};
+
+/**
+ * @typedef
+ * {{
+ *    customName: (string|undefined),
+ *    features: (Object<string, boolean>|undefined),
+ *    subset: (boolean|undefined),
+ * }}
+ */
+var EmbedFontOptions;
+/**
+ * @param {ArrayBuffer|Uint8Array} font
+ * @param {EmbedFontOptions=} options
+ * @returns {Promise<PDFLib.PDFFont>}
+ */
+PDFLib.PDFDocument.prototype.embedFont = function(font, options){};
+/**
+ * @param {string} font
+ * @param {string=} customName
+ * @returns {PDFLib.PDFFont}
+ */
+PDFLib.PDFDocument.prototype.embedStandardFont = function(font, customName){};
 /**
  * @returns {Promise<number>}
  */
@@ -359,6 +381,8 @@ PDFLib.PDFImage.prototype.ref;
 PDFLib.PDFFont = function(){};
 /** @type {PDFLib.PDFRef} */
 PDFLib.PDFFont.prototype.ref;
+/** @type {string} */
+PDFLib.PDFFont.prototype.name;
 /** @constructor */
 PDFLib.StandardFonts = function(){};
 
@@ -398,8 +422,42 @@ var PdfDrawimgOption;
 /**
  * @param {string} name
  * @param {PdfDrawimgOption} options
+ * @return {Array<PDFLib.PDFOperator>}
  */
 PDFLib.drawImage = function(name, options){};
+/**
+ * @constructor
+ */
+PDFLib.Color = function(){};
+/**
+ * @typedef
+ * {{
+ *    color: PDFLib.Color,
+ *    font: string,
+ *    graphicsState: (string|undefined),
+ *    lineHeight: number,
+ *    size: number,
+ *    rotate: (PDFLib.Rotation|undefined),
+ *    xSkew: (PDFLib.Rotation|undefined),
+ *    ySkew: (PDFLib.Rotation|undefined),
+ *    x: number,
+ *    y: number,
+ * }}
+ */
+var DrawLinesOfTextOptions;
+/**
+ * @param {Array<PDFLib.PDFHexString>} lines
+ * @param {DrawLinesOfTextOptions} options
+ * @return {Array<PDFLib.PDFOperator>}
+ */
+PDFLib.drawLinesOfText = function(lines, options){};
+/**
+ * @param {number} red
+ * @param {number} green
+ * @param {number} blue
+ * @return {PDFLib.Color}
+ */
+PDFLib.rgb = function(red, green, blue){};
 
 /**
  * @constructor

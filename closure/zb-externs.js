@@ -26,7 +26,7 @@ var SignAreaInfo;
  *    imgData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
  *    imgType: (string|undefined),
  *    text: (string|undefined),
- *    fontData: (PDFLib.StandardFonts|Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    fontData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
  *    img: (PDFLib.PDFImage|undefined),
  *    font: (PDFLib.PDFFont|undefined),
  * }}

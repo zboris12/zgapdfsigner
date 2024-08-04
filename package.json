@@ -1,6 +1,6 @@
 {
   "name": "zgapdfsigner",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "author": "zboris12",
   "description": "A javascript tool to sign a pdf or set protection to a pdf in web browser, Google Apps Script and nodejs.",
   "homepage": "https://github.com/zboris12/zgapdfsigner",
@@ -33,9 +33,10 @@
     "test": "node test4node.js"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
     "follow-redirects": "1.15.6",
-    "pdf-lib": "1.17.1",
-    "node-forge": "1.3.1"
+    "node-forge": "1.3.1",
+    "pdf-lib": "1.17.1"
   },
   "devDependencies": {
     "google-closure-compiler": "^20231112.0.0"
