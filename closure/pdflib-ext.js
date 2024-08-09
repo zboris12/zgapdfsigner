@@ -9,6 +9,9 @@
 var PdfLoadOptions;
 
 /** @const */
+var fontkit = {};
+
+/** @const */
 var PDFLib = {};
 
 /**
@@ -23,6 +26,21 @@ PDFLib.copyStringIntoBuffer = function(str, buffer, offset){};
  * @return {Uint8Array}
  */
 PDFLib.toUint8Array = function(input){};
+/**
+ * @param {string} text
+ * @return {string}
+ */
+PDFLib.cleanText = function(text){};
+/**
+ * @param {string} text
+ * @return {Array<string>}
+ */
+PDFLib.lineSplit = function(text){};
+/**
+ * @param {string} text
+ * @return {boolean}
+ */
+PDFLib.isNewlineChar = function(text){};
 
 /** @constructor */
 PDFLib.PDFDocument = function(){};
@@ -50,6 +68,10 @@ PDFLib.PDFDocument.prototype.save = function(options){};
  * @returns {Array<PDFLib.PDFPage>}
  */
 PDFLib.PDFDocument.prototype.getPages = function(){};
+/**
+ * @returns {number}
+ */
+PDFLib.PDFDocument.prototype.getPageCount = function(){};
 /**
  * @param {ArrayBuffer|Uint8Array|string} png
  * @returns {Promise<PDFLib.PDFImage>}
@@ -82,6 +104,10 @@ PDFLib.PDFDocument.prototype.embedFont = function(font, options){};
  * @returns {PDFLib.PDFFont}
  */
 PDFLib.PDFDocument.prototype.embedStandardFont = function(font, customName){};
+/**
+ * @lends {fontkit} fkt
+ */
+PDFLib.PDFDocument.prototype.registerFontkit = function(fkt){};
 /**
  * @returns {Promise<number>}
  */
@@ -383,8 +409,23 @@ PDFLib.PDFFont = function(){};
 PDFLib.PDFFont.prototype.ref;
 /** @type {string} */
 PDFLib.PDFFont.prototype.name;
-/** @constructor */
-PDFLib.StandardFonts = function(){};
+/**
+ * @param {string} text
+ * @return {PDFLib.PDFHexString }
+ */
+PDFLib.PDFFont.prototype.encodeText = function(text){};
+/**
+ * @param {number} size
+ * @param {Object<string, boolean>=} options
+ * @return {number}
+ */
+PDFLib.PDFFont.prototype.heightAtSize = function(size, options){};
+/**
+ * @param {string} text
+ * @param {number} size
+ * @return {number}
+ */
+PDFLib.PDFFont.prototype.widthOfTextAtSize = function(text, size){};
 
 PDFLib.RotationTypes = {};
 /** @type {string} */
@@ -416,6 +457,7 @@ PDFLib.PDFOperator = function(){};
  *    rotate: (PDFLib.Rotation|undefined),
  *    xSkew: (PDFLib.Rotation|undefined),
  *    ySkew: (PDFLib.Rotation|undefined),
+ *    graphicsState: (string|undefined),
  * }}
  */
 var PdfDrawimgOption;

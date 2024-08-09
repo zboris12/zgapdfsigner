@@ -14,7 +14,8 @@ And I use this name to hope the merits from this application will be dedicated t
 ## Main features
 
 * Sign a pdf with an invisible pkcs#7 signature.
-* Sign a pdf with a visible pkcs#7 signature by drawing an image.
+* Sign a pdf with a visible pkcs#7 signature by drawing an image or a text or both.
+* A visible signature can be placed on multiple pages. (In the same position)
 * Sign a pdf and set [DocMDP](https://github.com/zboris12/zgapdfsigner/wiki/API#note).
 * Add a new signature to a pdf if it has been signed already. (An incremental update)
 * Add a document timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser)
@@ -133,8 +134,10 @@ async function sign2(pdf, cert, pwd, imgdat, imgtyp){
         w: 60,  // width
         h: 60,  // height
       },
-      imgData: imgdat,
-      imgType: imgtyp,
+      imgInfo: {
+        imgData: imgdat,
+        imgType: imgtyp,
+      },
     },
   };
   var signer = new Zga.PdfSigner(sopt);
@@ -143,10 +146,41 @@ async function sign2(pdf, cert, pwd, imgdat, imgtyp){
 }
 ```
 
-Sign with a visible signature of drawing a text.
+Sign with a visible signature by drawing a text.
 
 ```js
-//TODO
+/**
+ * @param {ArrayBuffer} pdf
+ * @param {ArrayBuffer} cert
+ * @param {string} pwd
+ * @param {string} txt
+ * @param {ArrayBuffer} fontdat
+ * @return {Promise<Blob>}
+ */
+async function sign3(pdf, cert, pwd, txt, fontdat){
+  /** @type {SignOption} */
+  var sopt = {
+    p12cert: cert,
+    pwd: pwd,
+    drawinf: {
+      area: {
+        x: 25,  // left
+        y: 150, // top
+        w: 60,  // width
+        h: 60,  // height
+      },
+      textInfo: {
+        text: txt,
+        fontData: fontdat,
+        color: "#00f0f1",
+        size: 16,
+      },
+    },
+  };
+  var signer = new Zga.PdfSigner(sopt);
+  var u8arr = await signer.sign(pdf);
+  return new Blob([u8arr], {"type" : "application/pdf"});
+}
 ```
 
 Use it in [Google Apps Script](https://developers.google.com/apps-script)
@@ -198,6 +232,10 @@ async function main(){
   var ps = "";
   /** @type {string} */
   var imgPath = m_path.join(__dirname, "_test.png");
+  /** @type {string} */
+  var txt = "I am a test string!";
+  /** @type {string} */
+  var fontPath = m_path.join(__dirname, "_test.ttf");
 
   if(process.argv.length > 3){
     pfxPath = process.argv[2];
@@ -226,6 +264,11 @@ async function main(){
     img = m_fs.readFileSync(imgPath);
     imgType = m_path.extname(imgPath).slice(1);
   }
+  /** @type {Buffer} */
+  var font = null;
+  if(fontPath){
+    font = m_fs.readFileSync(fontPath);
+  }
 
   /** @type {SignOption} */
   var sopt = {
@@ -239,16 +282,24 @@ async function main(){
     ltv: 1,
     debug: true,
   };
-  if(img){
+  if(img || txt){
     sopt.drawinf = {
       area: {
         x: 25, // left
-        y: 150, // top
-        w: 60,
-        h: 60,
+        y: 50, // top
+        w: txt ? undefined : 60,
+        h: txt ? undefined : 100,
       },
-      imgData: img,
-      imgType: imgType,
+      pageidx: "2-3", // Placed the signature on the 3rd page and the 4th page. (Indexes of pages start from 0)
+      imgInfo: img ? {
+        imgData: img,
+        imgType: imgType,
+      } : undefined,
+      textInfo: txt ? {
+        text: txt,
+        fontData: font,
+        size: 16,
+      } : undefined,
     };
   }
 

@@ -10,9 +10,11 @@ const workpath = "test/";
  * @param {string} ps
  * @param {number} perm
  * @param {string=} imgPath
+ * @param {string=} txt
+ * @param {string=} fontPath
  * @return {Promise<string>} output path
  */
-async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
+async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath, txt, fontPath){
 	/** @type {Buffer} */
 	var pdf = m_fs.readFileSync(pdfPath);
 	/** @type {Buffer} */
@@ -21,6 +23,8 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
 	var img = null;
 	/** @type {string} */
 	var imgType = "";
+	/** @type {Buffer} */
+	var font = null;
 
 	if(perm == 1){
 		console.log("\nTest signing pdf with full protection. (permission 1 and password encryption)");
@@ -31,6 +35,9 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
 	if(imgPath){
 		img = m_fs.readFileSync(imgPath);
 		imgType = m_path.extname(imgPath).slice(1);
+	}
+	if(fontPath){
+		font = m_fs.readFileSync(fontPath);
 	}
 	/** @type {SignOption} */
 	var sopt = {
@@ -44,16 +51,31 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
 		ltv: 1,
 		debug: true,
 	};
-	if(img){
+	if(img || txt){
 		sopt.drawinf = {
 			area: {
 				x: 25, // left
-				y: 150, // top
-				w: 60,
-				h: 60,
+				y: 50, // top
+				w: txt ? undefined : 60,
+				h: txt ? undefined : 100,
 			},
-			imgData: img,
-			imgType: imgType,
+			pageidx: "-",
+			imgInfo: img ? {
+				imgData: img,
+				imgType: imgType,
+			} : undefined,
+			textInfo: txt ? {
+				text: txt,
+				fontData: font,
+				color: "00f0f1",
+				lineHeight: 20,
+				size: 16,
+				align: 1,
+				wMax: 80,
+				yOffset: 10,
+				xOffset: 20,
+				noBreaks: "[あいうえおA-Za-z0-9]",
+			} : undefined,
 		};
 	}
 
@@ -73,7 +95,7 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath){
 	var u8dat = await ser.sign(pdf, eopt);
 	if(u8dat){
 		/** @type {string} */
-		var outPath = m_path.join(__dirname, workpath+"test_perm"+perm+".pdf");
+		var outPath = m_path.join(__dirname, workpath+"test_perm"+perm+m_path.basename(pdfPath));
 		m_fs.writeFileSync(outPath, u8dat);
 		console.log("Output file: " + outPath);
 	}
@@ -109,15 +131,20 @@ async function addtsa(pdfPath){
 	return outPath;
 }
 
-async function main(){
+/**
+ * @param {number} angle
+ */
+async function main1(angle){
 	/** @type {string} */
-	var pdfPath = m_path.join(__dirname, workpath+"_test.pdf");
+	var pdfPath = m_path.join(__dirname, workpath+"_test"+(angle ? "_"+angle : "")+".pdf");
 	/** @type {string} */
 	var pfxPath = m_path.join(__dirname, workpath+"_test.pfx");
 	/** @type {string} */
 	var ps = "";
 	/** @type {string} */
 	var imgPath = m_path.join(__dirname, workpath+"_test.png");
+	/** @type {string} */
+	var fontPath = m_path.join(__dirname, workpath+"_test.ttf");
 
 	if(process.argv.length > 3){
 		pfxPath = process.argv[2];
@@ -132,14 +159,24 @@ async function main(){
 	}
 
 	if(pfxPath){
-		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath);
-		pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath);
+		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおか\r\n\nThis is a test of text!\n", fontPath);
+		pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, undefined, "ありがとうご\r\n\nThis is an another test of text!\n", fontPath);
 		await addtsa(pdfPath);
 	}else{
 		await addtsa(pdfPath);
 	}
 
 	console.log("Done");
+}
+
+async function main(){
+	/** @type {Array<number>} */
+	var arr = [0, 90, 180, 270];
+	/** @type {number} */
+	for(var i=0; i<arr.length; i++){
+		await main1(arr[i]);
+		// break;
+	}
 }
 
 main();

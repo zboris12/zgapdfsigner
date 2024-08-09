@@ -9,24 +9,74 @@
 var TsaServiceInfo;
 /**
  * the base point of x, y is top left corner.
+ * wDraw, hDraw: Only for internal process.
  * @typedef
  * {{
  *    x: number,
  *    y: number,
- *    w: number,
- *    h: number,
+ *    w: (number|undefined),
+ *    h: (number|undefined),
+ *    wDraw: (number|undefined),
+ *    hDraw: (number|undefined),
  * }}
  */
 var SignAreaInfo;
 /**
+ * fontData:   default: StandardFonts.Helvetica
+ * color:      A Hex string of color. default: #000
+ * opacity:    valid value is from 0 to 1. default: 1 // Not implemented
+ * blendMode:  https://pdf-lib.js.org/docs/api/enums/blendmode // Not implemented
+ * lineHeight: default is the height of the font at the given size
+ * xOffset:    An offset from SignAreaInfo's x
+ * yOffset:    An offset from SignAreaInfo's y
+ * align:      Text alignment: 0 left, 1 center, 2 right. default: 0
+ * noBreaks:   A regular expression string that indicates which characters should not be used to break a word. default: [A-Za-z0-9]
+ *
+ * @typedef
+ * {{
+ *    text: string,
+ *    fontData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    color: (string|undefined),
+ *    opacity: (number|undefined),
+ *    blendMode: (string|undefined),
+ *    lineHeight: (number|undefined),
+ *    size: number,
+ *    xOffset: (number|undefined),
+ *    yOffset: (number|undefined),
+ *    wMax: (number|undefined),
+ *    align: (number|undefined),
+ *    noBreaks: (string|undefined),
+ * }}
+ */
+var SignTextInfo;
+/**
+ * opacity:    valid value is from 0 to 1. default: 1 // Not implemented
+ * blendMode:  https://pdf-lib.js.org/docs/api/enums/blendmode // Not implemented
+ *
+ * @typedef
+ * {{
+ *    imgData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    imgType: (string|undefined),
+ *    opacity: (number|undefined),
+ *    blendMode: (string|undefined),
+ * }}
+ */
+var SignImageInfo;
+/**
+ * The signature can be placed in the same position on multiple pages, but all pages must have the same size and rotation angle.
+ * pageidx: Can be a string to indicate placing the signature on multiple pages.
+ *   For example: A pdf contains 17 pages and specify "-3,5-7,9,12,15-" means [0,1,2,3,5,6,7,9,12,15,16]
+ * imgData, imgType: Deprecated, use imgInfo instead.
+ * img, font: Only for internal process.
+ *
  * @typedef
  * {{
  *    area: SignAreaInfo,
- *    pageidx: (number|undefined),
+ *    pageidx: (number|string|undefined),
  *    imgData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
  *    imgType: (string|undefined),
- *    text: (string|undefined),
- *    fontData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    imgInfo: (SignImageInfo|undefined),
+ *    textInfo: (SignTextInfo|undefined),
  *    img: (PDFLib.PDFImage|undefined),
  *    font: (PDFLib.PDFFont|undefined),
  * }}
