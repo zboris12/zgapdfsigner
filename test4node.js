@@ -125,7 +125,7 @@ async function addtsa(pdfPath){
 	/** @type {Uint8Array} */
 	var u8dat = await ser.sign(pdf);
 	/** @type {string} */
-	var outPath = m_path.join(__dirname, workpath+"test_tsa.pdf");
+	var outPath = m_path.join(__dirname, workpath+"tsa_"+m_path.basename(pdfPath));
 	m_fs.writeFileSync(outPath, u8dat);
 	console.log("Output file: " + outPath);
 	return outPath;
@@ -159,7 +159,7 @@ async function main1(angle){
 	}
 
 	if(pfxPath){
-		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおか\r\n\nThis is a test of text!\n", fontPath);
+		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n", fontPath);
 		pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, undefined, "ありがとうご\r\n\nThis is an another test of text!\n", fontPath);
 		await addtsa(pdfPath);
 	}else{
