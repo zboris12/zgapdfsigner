@@ -51,7 +51,7 @@ Just import the dependencies and this tool.
 <script src="https://unpkg.com/node-forge@1.3.1/dist/forge.min.js" type="text/javascript"></script>
 <script src="https://cdn.jsdelivr.net/npm/zgapdfsigner/dist/zgapdfsigner.min.js" type="text/javascript"></script>
 ```
-When using feature of drawing text, importing the fontkit library is necessary.
+When drawing text by non-standard font, importing the fontkit library is necessary.
 ```html
 <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js" type="text/javascript"></script>
 ```
@@ -68,7 +68,7 @@ function setTimeout(func, sleep){
 var window = globalThis;
 // Load pdf-lib
 eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").getContentText());
-// It is necessary for drawing text feature.
+// It is necessary for drawing text by non-standard font.
 eval(UrlFetchApp.fetch("https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js").getContentText());
 // Load node-forge
 eval(UrlFetchApp.fetch("https://unpkg.com/node-forge@1.3.1/dist/forge.min.js").getContentText());
