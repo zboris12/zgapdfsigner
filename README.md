@@ -88,9 +88,18 @@ pdfkit.loadZga(globalThis);
 ```
 npm install zgapdfsigner
 ```
+If using [typescript](https://www.typescriptlang.org/) for development, installation of [definitely typed for node-forge](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node-forge) is necessary.
+```
+npm install --save-dev @types/node-forge
+```
 2. Import
 ```js
+// CommonJS Mode
 const Zga = require("zgapdfsigner");
+// ES Module Mode
+import { default as Zga } from "zgapdfsigner";
+// Typescript
+import * as Zga from "zgapdfsigner";
 ```
 
 ## Let's sign

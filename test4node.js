@@ -1,3 +1,10 @@
+// ES Module Mode
+// import * as m_fs from "node:fs";
+// import * as m_path from "node:path";
+// import { fileURLToPath } from "node:url";
+// import { default as Zga } from "./lib/zganode.js";
+// const __dirname = m_path.dirname(fileURLToPath(import.meta.url));
+
 const m_fs = require("fs");
 const m_path = require("path");
 const Zga = require("./lib/zganode.js");
