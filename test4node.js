@@ -30,7 +30,7 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath, txt, fontPath){
 	var img = null;
 	/** @type {string} */
 	var imgType = "";
-	/** @type {Buffer} */
+	/** @type {Buffer|string} */
 	var font = null;
 
 	if(perm == 1){
@@ -44,7 +44,11 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath, txt, fontPath){
 		imgType = m_path.extname(imgPath).slice(1);
 	}
 	if(fontPath){
-		font = m_fs.readFileSync(fontPath);
+		if(Zga.PDFLib.isStandardFont(fontPath)){
+			font = fontPath;
+		}else{
+			font = m_fs.readFileSync(fontPath);
+		}
 	}
 	/** @type {SignOption} */
 	var sopt = {
@@ -61,7 +65,7 @@ async function sign_protect(pdfPath, pfxPath, ps, perm, imgPath, txt, fontPath){
 	if(img || txt){
 		sopt.drawinf = {
 			area: {
-				x: 25, // left
+				x: perm ? 25 : 200, // left
 				y: 50, // top
 				w: txt ? undefined : 60,
 				h: txt ? undefined : 100,
@@ -152,6 +156,7 @@ async function main1(angle){
 	var imgPath = m_path.join(__dirname, workpath+"_test.png");
 	/** @type {string} */
 	var fontPath = m_path.join(__dirname, workpath+"_test.ttf");
+	// var fontPath = Zga.PDFLib.StandardFonts.CourierBold;
 
 	if(process.argv.length > 3){
 		pfxPath = process.argv[2];
@@ -166,8 +171,14 @@ async function main1(angle){
 	}
 
 	if(pfxPath){
-		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n", fontPath);
-		pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, undefined, "ありがとうご\r\n\nThis is an another test of text!\n", fontPath);
+		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n");
+		if(Zga.PDFLib.isStandardFont(fontPath)){
+			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath, "This is an another test of text!\n", fontPath);
+			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 0, undefined, "This is a test for same font!\n", fontPath);
+		}else{
+			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath, "ありがとうご\r\nThis is an another test of text!\n", fontPath);
+			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 0, undefined, "たちつてと\n\nThis is a test for same font!\n", fontPath);
+		}
 		await addtsa(pdfPath);
 	}else{
 		await addtsa(pdfPath);

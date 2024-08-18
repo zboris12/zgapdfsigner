@@ -37,7 +37,7 @@ export type SignAreaInfo = {
 };
 export type SignTextInfo = {
   text: string,
-  fontData?: Array<number> | Uint8Array | ArrayBuffer | string;
+  fontData?: Array<number> | Uint8Array | ArrayBuffer | PDFLib.StandardFonts;
   color?: string;
   opacity?: number;
   blendMode?: string;
@@ -108,4 +108,9 @@ export declare class TsaFetcher {
   getCertsChain(): CertsChain;
   getToken(forP7?: boolean): forge.asn1.Asn1;
   queryTsa(data?: string): Promise<string>;
+}
+export declare class PdfFonts {
+  private constructor();
+  static from(pdfdoc: PDFLib.PDFDocument): Promise<PdfFonts>;
+  getEmbeddedFont(fontData?: Array<number> | Uint8Array | ArrayBuffer | PDFLib.StandardFonts): Promise<PDFLib.PDFFont>;
 }

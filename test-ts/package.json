@@ -11,7 +11,7 @@
     "test": "node test/index.js ${pfxpwd}"
   },
   "dependencies": {
-    "zgapdfsigner": "^2.7.0"
+    "zgapdfsigner": "^2.7.1"
   },
   "devDependencies": {
     "@types/node-forge": "^1.3.11",

@@ -9,7 +9,17 @@
 var PdfLoadOptions;
 
 /** @const */
-var fontkit = {};
+var pako = {};
+/**
+ * @param {Uint8Array} input
+ * @return {Uint8Array}
+ */
+pako.inflate = function(input){};
+
+/** @constructor */
+var Fontkit = function(){};
+/** @const {Fontkit} */
+var fontkit;
 
 /** @const */
 var PDFLib = {};
@@ -41,6 +51,11 @@ PDFLib.lineSplit = function(text){};
  * @return {boolean}
  */
 PDFLib.isNewlineChar = function(text){};
+/**
+ * @param {string} fntnm
+ * @return {boolean}
+ */
+PDFLib.isStandardFont = function(fntnm){};
 
 /** @constructor */
 PDFLib.PDFDocument = function(){};
@@ -105,7 +120,7 @@ PDFLib.PDFDocument.prototype.embedFont = function(font, options){};
  */
 PDFLib.PDFDocument.prototype.embedStandardFont = function(font, customName){};
 /**
- * @lends {fontkit} fkt
+ * @param {Fontkit} fkt
  */
 PDFLib.PDFDocument.prototype.registerFontkit = function(fkt){};
 /**
@@ -316,6 +331,8 @@ PDFLib.PDFName.Annots;
  * @return {PDFLib.PDFName}
  */
 PDFLib.PDFName.of = function(value){};
+/** @return {string} */
+PDFLib.PDFName.prototype.asString = function(){};
 /** @type {string} */
 PDFLib.PDFName.prototype.encodedName;
 /** @type {number} */
@@ -339,9 +356,19 @@ PDFLib.PDFArray.prototype.push = function(object){};
  */
 PDFLib.PDFArray.prototype.get = function(idx){};
 /**
+ * @return {number}
+ */
+PDFLib.PDFArray.prototype.size = function(){};
+/**
  * @return {Array<PDFLib.PDFObject>}
  */
 PDFLib.PDFArray.prototype.asArray = function(){};
+/**
+ * @param {number} idx
+ * @param {*} typ
+ * @return {PDFLib.PDFObject}
+ */
+PDFLib.PDFArray.prototype.lookupMaybe = function(idx, typ){};
 
 /**
  * @constructor
@@ -404,7 +431,33 @@ PDFLib.PDFImage.prototype.size = function(){};
 PDFLib.PDFImage.prototype.ref;
 
 /** @constructor */
+PDFLib.StandardFontEmbedder = function(){};
+/**
+ * @param {string} fontName
+ * @param {string=} customName
+ * @return {PDFLib.StandardFontEmbedder}
+ */
+PDFLib.StandardFontEmbedder.for = function(fontName, customName){};
+
+/** @constructor */
+PDFLib.CustomFontEmbedder = function(){};
+/**
+ * @param {Fontkit} fontkit
+ * @param {Uint8Array} fontData
+ * @param {string=} customName
+ * @return {PDFLib.CustomFontEmbedder}
+ */
+PDFLib.CustomFontEmbedder.for = function(fontkit, fontData, customName){};
+
+/** @constructor */
 PDFLib.PDFFont = function(){};
+/**
+ * @param {PDFLib.PDFRef} ref
+ * @param {PDFLib.PDFDocument} doc
+ * @param {PDFLib.StandardFontEmbedder|PDFLib.CustomFontEmbedder} embedder
+ * @return {PDFLib.PDFFont}
+ */
+PDFLib.PDFFont.of = function(ref, doc, embedder){};
 /** @type {PDFLib.PDFRef} */
 PDFLib.PDFFont.prototype.ref;
 /** @type {string} */
@@ -540,6 +593,12 @@ PDFLib.PDFContentStream.of = function(dict, operators, encode){};
  * @extends {PDFLib.PDFStream}
  */
 PDFLib.PDFRawStream = function(){};
+/** @type {PDFLib.PDFDict} */
+PDFLib.PDFRawStream.prototype.dict;
+/**
+ * @return {Uint8Array}
+ */
+PDFLib.PDFRawStream.prototype.getContents = function(){};
 
 /**
  * @constructor

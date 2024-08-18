@@ -51,9 +51,10 @@ Just import the dependencies and this tool.
 <script src="https://unpkg.com/node-forge@1.3.1/dist/forge.min.js" type="text/javascript"></script>
 <script src="https://cdn.jsdelivr.net/npm/zgapdfsigner/dist/zgapdfsigner.min.js" type="text/javascript"></script>
 ```
-When drawing text by non-standard font, importing the fontkit library is necessary.
+When drawing text for signature, importing fontkit and pako library is necessary.
 ```html
 <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/pako@1.0.11/dist/pako_inflate.min.js" type="text/javascript"></script>
 ```
 
 ### [Google Apps Script](https://developers.google.com/apps-script)
@@ -68,8 +69,10 @@ function setTimeout(func, sleep){
 var window = globalThis;
 // Load pdf-lib
 eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").getContentText());
-// It is necessary for drawing text by non-standard font.
+// It is necessary for drawing text for signature.
 eval(UrlFetchApp.fetch("https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js").getContentText());
+// Load pako, It is necessary for drawing text for signature.
+eval(UrlFetchApp.fetch("https://unpkg.com/pako@1.0.11/dist/pako_inflate.min.js").getContentText());
 // Load node-forge
 eval(UrlFetchApp.fetch("https://unpkg.com/node-forge@1.3.1/dist/forge.min.js").getContentText());
 // Load ZgaPdfSigner
