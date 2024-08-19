@@ -36,6 +36,7 @@ var SignAreaInfo;
  * {{
  *    text: string,
  *    fontData: (Array<number>|Uint8Array|ArrayBuffer|string|undefined),
+ *    subset: (boolean|undefined),
  *    color: (string|undefined),
  *    opacity: (number|undefined),
  *    blendMode: (string|undefined),

@@ -38,6 +38,7 @@ export type SignAreaInfo = {
 export type SignTextInfo = {
   text: string,
   fontData?: Array<number> | Uint8Array | ArrayBuffer | PDFLib.StandardFonts;
+  subset?: boolean;
   color?: string;
   opacity?: number;
   blendMode?: string;
@@ -112,5 +113,5 @@ export declare class TsaFetcher {
 export declare class PdfFonts {
   private constructor();
   static from(pdfdoc: PDFLib.PDFDocument): Promise<PdfFonts>;
-  getEmbeddedFont(fontData?: Array<number> | Uint8Array | ArrayBuffer | PDFLib.StandardFonts): Promise<PDFLib.PDFFont>;
+  getEmbeddedFont(fontData?: Array<number> | Uint8Array | ArrayBuffer | PDFLib.StandardFonts, subset?: boolean): Promise<PDFLib.PDFFont>;
 }

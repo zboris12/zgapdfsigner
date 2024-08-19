@@ -39,6 +39,8 @@ signing with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wik
 * [pdf-lib](https://pdf-lib.js.org/)
 * [node-forge](https://github.com/digitalbazaar/forge)
 * [follow-redirects](https://github.com/follow-redirects/follow-redirects)
+* [pako](https://github.com/nodeca/pako) - For drawing text
+* [pdf-fontkit](https://github.com/znacloud/pdf-fontkit) - For drawing text
 
 ## How to use this tool
 
@@ -53,9 +55,10 @@ Just import the dependencies and this tool.
 ```
 When drawing text for signature, importing fontkit and pako library is necessary.
 ```html
-<script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js" type="text/javascript"></script>
+<script src="https://unpkg.com/pdf-fontkit@1.8.9/dist/fontkit.umd.min.js" type="text/javascript"></script>
 <script src="https://unpkg.com/pako@1.0.11/dist/pako_inflate.min.js" type="text/javascript"></script>
 ```
+Thanks to [znacloud](https://github.com/znacloud/pdf-fontkit) for fixing the font subsetting issue in [@pdf-lib/fontkit](https://github.com/Hopding/fontkit).
 
 ### [Google Apps Script](https://developers.google.com/apps-script)
 Load the dependencies and this tool.
@@ -70,7 +73,7 @@ var window = globalThis;
 // Load pdf-lib
 eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").getContentText());
 // It is necessary for drawing text for signature.
-eval(UrlFetchApp.fetch("https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js").getContentText());
+eval(UrlFetchApp.fetch("https://unpkg.com/pdf-fontkit@1.8.9/dist/fontkit.umd.min.js").getContentText());
 // Load pako, It is necessary for drawing text for signature.
 eval(UrlFetchApp.fetch("https://unpkg.com/pako@1.0.11/dist/pako_inflate.min.js").getContentText());
 // Load node-forge
