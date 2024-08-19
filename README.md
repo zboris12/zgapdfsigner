@@ -68,6 +68,10 @@ function setTimeout(func, sleep){
   Utilities.sleep(sleep);
   func();
 }
+// Simulate clearTimeout function for pdf-fontkit
+function clearTimeout(timeoutID){
+  // Do nothing
+}
 // Simulate window for node-forge
 var window = globalThis;
 // Load pdf-lib
