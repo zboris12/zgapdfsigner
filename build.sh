@@ -9,6 +9,8 @@ else
 	mkdir ${OUTFLDR}
 fi
 
+VER=$(sed -n -r "s/^.*\"version\": ?\"([0-9.]+)\".*$/\1/p" package.json)
+
 GCCOPT="--charset UTF-8 --compilation_level SIMPLE_OPTIMIZATIONS --warning_level VERBOSE"
 GCCEXT="--externs closure/google-ext.js --externs closure/forge-ext.js --externs closure/pdflib-ext.js --externs closure/zb-externs.js"
 jss=""
@@ -20,7 +22,12 @@ do
 		if [ "$c" != "#" ]
 		then
 			outf="${OUTFLDR}/_${js}"
-			sed -e "s/\/\/Only for nodejs Start\/\//\/*/g" -e "s/\/\/Only for nodejs End\/\//*\//g" "lib/${js}" > "${outf}"
+			if [ "${js}" = "zgaindex.js" ]
+			then
+				sed -e "s/\/\/Only for nodejs Start\/\//\/*/g" -e "s/\/\/Only for nodejs End\/\//*\//g" -e "s/ver: \"\"/ver: \"${VER}\"/" "lib/${js}" > "${outf}"
+			else
+				sed -e "s/\/\/Only for nodejs Start\/\//\/*/g" -e "s/\/\/Only for nodejs End\/\//*\//g" "lib/${js}" > "${outf}"
+			fi
 			if [ $? -eq 0 ]
 			then
 				echo "Created js file: ${outf}"
@@ -32,6 +39,7 @@ do
 		fi
 	fi
 done <<EOF
+zgafetch.js
 zgacertsutil.js
 zgapdfcryptor.js
 zgapdfsigner.js
