@@ -81,6 +81,7 @@ async function testMe(){
 		sopt = {
 			p12cert: pfx,
 			pwd: ps,
+			// signdate: "/1",
 			permission: parseInt(document.getElementById("sperm").value),
 			reason: document.getElementById("tReason").value,
 			location: document.getElementById("tLocation").value,
@@ -188,6 +189,22 @@ function changeSperm(){
 		spn.innerText = "";
 		break;
 	}
+}
+// test urlFetch
+async function main2(){
+	/** @type {Uint8Array} */
+	var u8arr = await Zga.urlFetch("http://localhost:8080", {
+		"headers": {
+			"testzb": "orange"
+		}
+	});
+	// /** @type {string} */
+	// var str = btoa(Zga.u8arrToRaw(u8arr));
+	/** @type {TextDecoder} */
+	var txtdec = new TextDecoder('utf-8');
+	/** @type {string} */
+	var str = txtdec.decode(u8arr);
+	console.log(str);
 }
 </script>
 <style>

@@ -187,6 +187,55 @@ async function main1(angle){
 	console.log("Done");
 }
 
+// test urlFetch
+async function main2(){
+	/** @type {Uint8Array} */
+	var u8arr = await Zga.urlFetch("http://localhost:8080", {
+		"headers": {
+			"testzb": "pineapple"
+		}
+	});
+	// /** @type {string} */
+	// var str = btoa(Zga.u8arrToRaw(u8arr));
+	/** @type {TextDecoder} */
+	var txtdec = new TextDecoder("utf-8");
+	/** @type {string} */
+	var str = txtdec.decode(u8arr);
+	console.log(str);
+}
+
+function webserver(){
+	require("http").createServer(function(req, res){
+		if(req.method == "GET"){
+			if(req.headers["testzb"]){
+				res.setHeader("Access-Control-Allow-Origin", "*");
+				if(req.url == "/"){
+					console.log(req.headers["testzb"]);
+					res.writeHead(302, {"Location": "/testzb"});
+					res.end();
+				}else if(req.url == "/testzb"){
+					res.writeHead(200, {"Content-Type": "text/plain"});
+					res.end("I am redirected!\n");
+				}else{
+					res.statusCode = 500;
+					res.statusMessage = "Bad Request.";
+					res.end();
+				}
+			}else{
+				res.writeHead(200, {"Content-Type": "text/plain"});
+				res.end("Hello World\n");
+			}
+		}else if(req.method == "OPTIONS"){
+			res.setHeader("Access-Control-Allow-Origin", "*");
+			res.setHeader("Access-Control-Allow-Method", "GET, OPTIONS, HEAD");
+			res.setHeader("Access-Control-Allow-Headers", "Accept, Accept-Language, Content-Language, Content-Type, Range, testzb");
+			res.statusCode = 200;
+			res.statusMessage = "CORS OK";
+			res.end();
+		}
+	}).listen(8080, function(){console.log("Server http://localhost:8080")});
+}
+
 async function main(){
 	/** @type {Array<number>} */
 	var arr = [0, 90, 180, 270];
@@ -197,4 +246,10 @@ async function main(){
 	}
 }
 
-main();
+if(process.argv[2] == "webserver"){
+	webserver();
+}else if(process.argv[2] == "fetch"){
+	main2();
+}else{
+	main();
+}
