@@ -171,7 +171,7 @@ async function main1(angle){
 	}
 
 	if(pfxPath){
-		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n");
+		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n", fontPath);
 		if(Zga.PDFLib.isStandardFont(fontPath)){
 			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath, "This is an another test of text!\n", fontPath);
 			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 0, undefined, "This is a test for same font!\n", fontPath);
