@@ -76,6 +76,19 @@ function clearTimeout(timeoutID){
 }
 // Simulate window for node-forge
 var window = globalThis;
+// simulate atob for zgapdfsigner
+function atob(base64String) {
+  // 1. Decode Base64 string into a byte array
+  var decoded = Utilities.base64Decode(base64String);
+
+  // 2. Convert each byte to a string using its character code
+  // Since atob returns a "binary string", concatenate each element using String.fromCharCode
+  return decoded.map(function (byte) {
+    // Since Google Apps Script's bytes are signed (-128 to 127), correct them to the range of 0-255
+    return String.fromCharCode(byte & 0xFF);
+  }).join('');
+};
+
 // Load pdf-lib
 eval(UrlFetchApp.fetch("https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js").getContentText());
 // It is necessary for drawing text for signature.
