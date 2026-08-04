@@ -197,23 +197,38 @@ async function main1(angle){
 
 // test urlFetch
 async function main2(){
-	/** @type {Uint8Array} */
-	var u8arr = await Zga.urlFetch("http://localhost:8080", {
-		"headers": {
-			"testzb": "pineapple"
-		}
-	});
-	// /** @type {string} */
-	// var str = btoa(Zga.u8arrToRaw(u8arr));
-	/** @type {TextDecoder} */
-	var txtdec = new TextDecoder("utf-8");
-	/** @type {string} */
-	var str = txtdec.decode(u8arr);
-	console.log(str);
+	// Boot a throwaway server on an ephemeral port so this test is self
+	// contained and cannot collide with an already running `npm run server`.
+	/** @type {http.Server} */
+	var srv = await startWebserver(0);
+	/** @type {number} */
+	var port = srv.address().port;
+	try{
+		/** @type {Uint8Array} */
+		var u8arr = await Zga.urlFetch("http://localhost:"+port, {
+			"headers": {
+				"testzb": "pineapple"
+			}
+		});
+		// /** @type {string} */
+		// var str = btoa(Zga.u8arrToRaw(u8arr));
+		/** @type {TextDecoder} */
+		var txtdec = new TextDecoder("utf-8");
+		/** @type {string} */
+		var str = txtdec.decode(u8arr);
+		console.log(str);
+	}finally{
+		srv.close();
+	}
 }
 
-function webserver(){
-	require("http").createServer(function(req, res){
+/**
+ * @param {number} port Port to listen on. 0 picks a free ephemeral port.
+ * @return {Promise<http.Server>} The listening server.
+ */
+function startWebserver(port){
+	/** @type {http.Server} */
+	var srv = require("http").createServer(function(req, res){
 		if(req.method == "GET"){
 			if(req.headers["testzb"]){
 				res.setHeader("Access-Control-Allow-Origin", "*");
@@ -241,7 +256,14 @@ function webserver(){
 			res.statusMessage = "CORS OK";
 			res.end();
 		}
-	}).listen(8080, function(){console.log("Server http://localhost:8080")});
+	});
+	return new Promise(function(resolve, reject){
+		srv.once("error", reject);
+		srv.listen(port, function(){
+			console.log("Server http://localhost:"+srv.address().port);
+			resolve(srv);
+		});
+	});
 }
 
 async function main(){
@@ -254,10 +276,21 @@ async function main(){
 	}
 }
 
+/**
+ * @param {Promise<*>} p
+ */
+function run(p){
+	p.catch(function(err){
+		console.error(err);
+		process.exitCode = 1;
+	});
+}
+
 if(process.argv[2] == "webserver"){
-	webserver();
+	// Fixed port, because test.html expects the server on 8080.
+	run(startWebserver(8080));
 }else if(process.argv[2] == "fetch"){
-	main2();
+	run(main2());
 }else{
-	main();
+	run(main());
 }

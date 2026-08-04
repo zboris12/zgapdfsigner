@@ -28,3 +28,25 @@ test("RsaSigner reports SHA-256 as its digest algorithm OID", () => {
 
 	assert.strictEqual(signer.getDigestAlgorithmOid(), forge.pki.oids.sha256);
 });
+
+test("RsaSigner reports sha256WithRSAEncryption as its signature algorithm OID", () => {
+	const {privateKey, certificate} = makeKeyCert(3072);
+	const signer = new Zga.RsaSigner(privateKey, certificate);
+
+	assert.strictEqual(signer.getSignatureAlgorithmOid(), forge.pki.oids.sha256WithRSAEncryption);
+});
+
+test("createSigner returns an RsaSigner for an RSA key", () => {
+	const {privateKey, certificate} = makeKeyCert(3072);
+
+	const signer = Zga.createSigner(privateKey, certificate);
+
+	assert.ok(signer instanceof Zga.RsaSigner);
+});
+
+test("createSigner rejects an unsupported (non-RSA) key type", () => {
+	assert.throws(
+		() => Zga.createSigner({}, null),
+		/only RSA keys are supported/,
+	);
+});
