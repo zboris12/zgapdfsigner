@@ -95,8 +95,14 @@ var SignDrawInfo;
  *  1 : auto; Try using ocsp only to enable the LTV first; If can't, try using crl to enable the LTV.
  *  2 : crl only; Only try using crl to enable the LTV.
  *
- * minRsaKeyBits: Minimum accepted RSA modulus length in bits. Defaults to 3000
- *  per CCN-STIC-221; signing keys shorter than this are rejected.
+ * strictCrypto: Enforce the algorithms approved by CCN-STIC-221. Defaults to
+ *  false, which keeps the current behaviour. When true, signing keys must be
+ *  RSA of at least 3000 bits with a public exponent satisfying log2(e) > 16.
+ *  It also turns on strict encryption when an EncryptOption is passed to sign().
+ *
+ * minRsaKeyBits: Minimum accepted RSA modulus length in bits. Setting it enables
+ *  the key length check on its own and overrides the 3000-bit default of
+ *  strictCrypto.
  *
  * @typedef
  * {{
@@ -110,6 +116,7 @@ var SignDrawInfo;
  *    signame: (string|undefined),
  *    drawinf: (SignDrawInfo|undefined),
  *    ltv: (number|undefined),
+ *    strictCrypto: (boolean|undefined),
  *    minRsaKeyBits: (number|undefined),
  *    debug: (boolean|undefined),
  * }}
@@ -140,7 +147,7 @@ var PubKeyInfo;
  *
  * pubkeys: Array of recipients containing public-key certificates ('c') and permissions ('p'). If want to encrypt the pdf by the certificate of signing, just apply a PubKeyInfo without c.
  *
- * allowLegacyEncryption: Allow non-authorized encryption modes (RC4-40, RC4-128, AES-128). Defaults to false; only AES-256 is accepted per CCN-STIC-221 unless this is set to true.
+ * strictCrypto: Enforce the algorithms approved by CCN-STIC-221. Defaults to false, which keeps every encryption mode available. When true, only AES-256 is accepted.
  *
  * @typedef
  * {{
@@ -149,7 +156,7 @@ var PubKeyInfo;
  *    userpwd: (string|undefined),
  *    ownerpwd: (string|undefined),
  *    pubkeys: (Array<PubKeyInfo>|undefined),
- *    allowLegacyEncryption: (boolean|undefined),
+ *    strictCrypto: (boolean|undefined),
  * }}
  */
 var EncryptOption;

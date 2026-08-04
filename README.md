@@ -22,41 +22,62 @@ And I use this name to hope the merits from this application will be dedicated t
 * Sign a pdf with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser :sunflower:)
 * Enable signature's [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser :sunflower:)
 * Set password protection to a pdf. Supported algorithms:
-  * 256bit AES Encryption (default; the only algorithm allowed out of the box)
-  * 128bit AES Encryption ( :warning: legacy, opt-in)
-  * 128bit RC4 Encryption ( :warning: legacy, opt-in)
-  * 40bit RC4 Encryption ( :warning: legacy, opt-in)
+  * 40bit RC4 Encryption
+  * 128bit RC4 Encryption
+  * 128bit AES Encryption
+  * 256bit AES Encryption
 * Set public-key certificate protection to a pdf.
   Supported algorithms are as same as the password protection.
+* Optionally enforce the algorithms approved by [CCN-STIC-221](https://www.ccn-cert.cni.es/).
 
-## Cryptographic constraints (CCN-STIC-221)
+## Enforcing CCN-STIC-221 (optional)
 
-This tool enforces the cryptographic requirements of
-[CCN-STIC-221](https://www.ccn-cert.cni.es/) by default. Two rules apply:
+[CCN-STIC-221](https://www.ccn-cert.cni.es/) is the approved-algorithms guide of
+the Spanish national cryptology centre. Set `strictCrypto: true` to make this
+tool refuse anything the guide does not authorize. __It is off by default, so
+nothing changes unless you ask for it.__
 
-__1. Only AES-256 encryption is allowed.__ RC4 is a stream cipher and is not
-authorized, and the RC4 / AES-128 PDF security handlers derive their key with
-MD5. Passing any other mode throws. Set `allowLegacyEncryption` to opt out when
-you need backward compatibility with old readers:
+When it is on:
 
-```js
-var eopt = {
-  mode: Zga.Crypto.Mode.RC4_128,
-  allowLegacyEncryption: true, // required, otherwise this throws
-  userpwd: upwd,
-};
-```
-
-__2. Signing keys must be RSA of at least 3000 bits, with log2(e) > 16.__
-A certificate carrying a shorter key (2048 bits, for example) is rejected when
-it is loaded. The standard public exponent 65537 already satisfies the exponent
-rule. Lower the modulus threshold with `minRsaKeyBits` if you must:
+* __Only AES-256 encryption is accepted.__ RC4 is a stream cipher and is not
+  authorized, and the RC4 / AES-128 PDF security handlers derive their key with
+  MD5. Any other mode throws.
+* __Signing keys must be RSA of at least 3000 bits, with log2(e) > 16.__ A
+  certificate carrying a shorter key is rejected when it is loaded. The standard
+  public exponent 65537 already satisfies the exponent rule.
 
 ```js
 var sopt = {
   p12cert: cert,
   pwd: pwd,
-  minRsaKeyBits: 2048, // accepts a 2048bit key; not CCN-STIC-221 compliant
+  strictCrypto: true,
+};
+var eopt = {
+  mode: Zga.Crypto.Mode.AES_256, // anything else throws under strictCrypto
+  userpwd: upwd,
+};
+// strictCrypto on the SignOption also applies to the encryption step.
+var u8arr = await new Zga.PdfSigner(sopt).sign(pdf, eopt);
+```
+
+`PdfCryptor` accepts the same flag when used on its own:
+
+```js
+var cyptor = new Zga.PdfCryptor({
+  mode: Zga.Crypto.Mode.AES_256,
+  userpwd: upwd,
+  strictCrypto: true,
+});
+```
+
+`minRsaKeyBits` sets the minimum RSA modulus length. Setting it turns on the key
+length check on its own, and it overrides the 3000-bit default of `strictCrypto`:
+
+```js
+var sopt = {
+  p12cert: cert,
+  pwd: pwd,
+  minRsaKeyBits: 2048, // rejects keys under 2048bit; not CCN-STIC-221 compliant
 };
 ```
 
@@ -404,7 +425,7 @@ Set password protection to the pdf.
 async function protect1(pdf, upwd, opwd){
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.AES_256,
+    mode: Zga.Crypto.Mode.RC4_40,
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     userpwd: upwd,
     ownerpwd: opwd,
@@ -427,7 +448,7 @@ Set public-key certificate protection to the pdf.
 async function protect2(pdf, cert){
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.AES_256,
+    mode: Zga.Crypto.Mode.AES_128,
     pubkeys: [{
       c: cert,
       p: ["copy", "modify", "copy-extract", "annot-forms", "fill-forms", "extract", "assemble"],
@@ -458,7 +479,7 @@ async function signAndProtect1(pdf, cert, pwd, opwd){
   };
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.AES_256,
+    mode: Zga.Crypto.Mode.RC4_128,
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     ownerpwd: opwd,
   };

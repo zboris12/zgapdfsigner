@@ -24,7 +24,7 @@ export type EncryptOption = {
   userpwd?: string;
   ownerpwd?: string;
   pubkeys?: Array<PubKeyInfo>;
-  allowLegacyEncryption?: boolean;
+  strictCrypto?: boolean;
 };
 export type PubKeyInfo = {
   c?: Array<number> | Uint8Array | ArrayBuffer | string | forge.pki.Certificate;
@@ -78,6 +78,7 @@ export type SignOption = {
   signame?: string;
   drawinf?: SignDrawInfo;
   ltv?: number;
+  strictCrypto?: boolean;
   minRsaKeyBits?: number;
   debug?: boolean;
 };

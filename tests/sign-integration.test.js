@@ -50,12 +50,36 @@ test("PdfSigner.sign encrypts the output when an AES-256 EncryptOption is given"
 	assert.match(dump, /adbe\.pkcs7\.detached/, "still carries the detached signature");
 });
 
-test("PdfSigner.sign refuses a legacy encryption mode", async () => {
+test("PdfSigner.sign accepts a legacy encryption mode by default", async () => {
 	const pdfBytes = await minimalPdf();
 	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD});
+
+	const signed = await signer.sign(pdfBytes, {mode: Zga.Crypto.Mode.RC4_128, userpwd: "user-pw"});
+
+	assert.match(Buffer.from(signed).toString("latin1"), /\/Encrypt/);
+});
+
+// strictCrypto on the SignOption has to reach the cryptor, otherwise a caller
+// asking for compliance would silently get a non-compliant encryption handler.
+test("PdfSigner.sign propagates strictCrypto to the encryption step", async () => {
+	const pdfBytes = await minimalPdf();
+	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD, strictCrypto: true});
 
 	await assert.rejects(
 		() => signer.sign(pdfBytes, {mode: Zga.Crypto.Mode.RC4_128, userpwd: "user-pw"}),
 		/not authorized by CCN-STIC-221/,
 	);
+});
+
+test("an explicit strictCrypto on the EncryptOption wins over the SignOption", async () => {
+	const pdfBytes = await minimalPdf();
+	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD, strictCrypto: true});
+
+	const signed = await signer.sign(pdfBytes, {
+		mode: Zga.Crypto.Mode.RC4_128,
+		userpwd: "user-pw",
+		strictCrypto: false,
+	});
+
+	assert.match(Buffer.from(signed).toString("latin1"), /\/Encrypt/);
 });
