@@ -34,6 +34,7 @@
     "build": "./build.sh",
     "server": "node test4node.js webserver",
     "test": "node test4node.js ${pfxpwd}",
+    "test1": "node --test",
     "test2": "node test4node.js fetch"
   },
   "dependencies": {
