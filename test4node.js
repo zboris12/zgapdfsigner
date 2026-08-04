@@ -156,7 +156,10 @@ async function main1(angle){
 	var imgPath = m_path.join(__dirname, workpath+"_test.png");
 	/** @type {string} */
 	var fontPath = m_path.join(__dirname, workpath+"_test.ttf");
-	// var fontPath = Zga.PDFLib.StandardFonts.CourierBold;
+	if(!m_fs.existsSync(fontPath)){
+		// Fall back to a built-in font when no custom TTF has been supplied.
+		fontPath = Zga.PDFLib.StandardFonts.CourierBold;
+	}
 
 	if(process.argv.length > 3){
 		pfxPath = process.argv[2];
@@ -171,7 +174,12 @@ async function main1(angle){
 	}
 
 	if(pfxPath){
-		await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n", fontPath);
+		// Standard fonts are WinAnsi-encoded and cannot render Japanese text.
+		if(Zga.PDFLib.isStandardFont(fontPath)){
+			await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "This is a test of text!\n", fontPath);
+		}else{
+			await sign_protect(pdfPath, pfxPath, ps, 1, imgPath, "あいうえおあいうえおか\r\n\nThis is a test of text!\n", fontPath);
+		}
 		if(Zga.PDFLib.isStandardFont(fontPath)){
 			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 2, imgPath, "This is an another test of text!\n", fontPath);
 			pdfPath = await sign_protect(pdfPath, pfxPath, ps, 0, undefined, "This is a test for same font!\n", fontPath);

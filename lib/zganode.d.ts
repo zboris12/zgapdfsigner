@@ -100,6 +100,13 @@ export declare class PdfCryptor {
   encryptPdf(pdf: PDFLib.PDFDocument | Array<number> | Uint8Array | ArrayBuffer | string, ref?: PDFLib.PDFRef): Promise<PDFLib.PDFDocument>;
   encryptObject(num: number, val: PDFLib.PDFObject): void;
 }
+export declare class RsaSigner {
+  constructor(privateKey: forge.pki.rsa.PrivateKey, certificate: forge.pki.Certificate);
+  privateKey: forge.pki.rsa.PrivateKey;
+  certificate: forge.pki.Certificate;
+  getDigestAlgorithmOid(): string;
+  sign(data: string): string;
+}
 export declare class PdfSigner {
   constructor(signopt: SignOption);
   sign(pdf: PDFLib.PDFDocument | Array<number> | Uint8Array | ArrayBuffer | string, cypopt?: EncryptOption): Promise<Uint8Array>;

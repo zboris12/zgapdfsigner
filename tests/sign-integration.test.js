@@ -1,0 +1,34 @@
+"use strict";
+
+const {test} = require("node:test");
+const assert = require("node:assert");
+const Zga = require("../lib/zganode.js");
+const {makeP12} = require("../testutil/fixtures.js");
+
+const PWD = "test-pw";
+
+/**
+ * Build a minimal one-page PDF with pdf-lib.
+ * @return {Promise<Uint8Array>}
+ */
+async function minimalPdf(){
+	const doc = await Zga.PDFLib.PDFDocument.create();
+	doc.addPage([300, 300]);
+	return doc.save();
+}
+
+// End-to-end safety net for the crypto-agility refactor: signing a real PDF
+// must keep producing a valid detached PKCS#7 signature dictionary.
+test("PdfSigner.sign produces a detached PKCS#7 signature over a real PDF", async () => {
+	const pdfBytes = await minimalPdf();
+	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD});
+
+	const signed = await signer.sign(pdfBytes);
+	const dump = Buffer.from(signed).toString("latin1");
+
+	assert.ok(signed instanceof Uint8Array, "returns a Uint8Array");
+	assert.ok(signed.length > pdfBytes.length, "signed output is larger than the input");
+	assert.match(dump, /adbe\.pkcs7\.detached/, "uses the detached PKCS#7 SubFilter");
+	assert.match(dump, /ByteRange/, "embeds a ByteRange");
+	assert.match(dump, /\/Type\s*\/Sig/, "embeds a signature dictionary");
+});
