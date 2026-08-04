@@ -3,7 +3,10 @@
 const Zga = require("../lib/zganode.js");
 const forge = Zga.forge;
 
-/** @type {Map<number, {privateKey: *, publicKey: *, certificate: *}>} key cache */
+/** @type {number} The de-facto standard public exponent (F4). */
+const DEFAULT_EXPONENT = 0x10001;
+
+/** @type {Map<string, {privateKey: *, publicKey: *, certificate: *}>} key cache */
 const keyCache = new Map();
 
 /**
@@ -11,13 +14,16 @@ const keyCache = new Map();
  * modulus length, as raw node-forge objects.
  *
  * @param {number} bits RSA modulus length in bits.
+ * @param {number=} e RSA public exponent. Defaults to 65537.
  * @return {{privateKey: *, publicKey: *, certificate: *}}
  */
-function makeKeyCert(bits){
-	if(keyCache.has(bits)){
-		return keyCache.get(bits);
+function makeKeyCert(bits, e){
+	const exponent = e === undefined ? DEFAULT_EXPONENT : e;
+	const cacheKey = bits + ":" + exponent;
+	if(keyCache.has(cacheKey)){
+		return keyCache.get(cacheKey);
 	}
-	const keys = forge.pki.rsa.generateKeyPair({bits: bits, e: 0x10001});
+	const keys = forge.pki.rsa.generateKeyPair({bits: bits, e: exponent});
 	const cert = forge.pki.createCertificate();
 	cert.publicKey = keys.publicKey;
 	cert.serialNumber = "01";
@@ -28,21 +34,23 @@ function makeKeyCert(bits){
 	cert.setIssuer(attrs);
 	cert.sign(keys.privateKey, forge.md.sha256.create());
 	const entry = {privateKey: keys.privateKey, publicKey: keys.publicKey, certificate: cert};
-	keyCache.set(bits, entry);
+	keyCache.set(cacheKey, entry);
 	return entry;
 }
 
 /**
  * Build a self-signed PKCS#12 (returned as a DER binary string) carrying an
  * RSA key of the given modulus length. Used to exercise the CCN-STIC-221
- * key-length guard in loadP12cert without shipping binary fixtures.
+ * key-length and public-exponent guards in loadP12cert without shipping
+ * binary fixtures.
  *
  * @param {number} bits RSA modulus length in bits.
  * @param {string} pwd PKCS#12 password.
+ * @param {number=} e RSA public exponent. Defaults to 65537.
  * @return {string} DER-encoded PKCS#12 as a binary string.
  */
-function makeP12(bits, pwd){
-	const kc = makeKeyCert(bits);
+function makeP12(bits, pwd, e){
+	const kc = makeKeyCert(bits, e);
 	const asn1 = forge.pkcs12.toPkcs12Asn1(kc.privateKey, [kc.certificate], pwd, {algorithm: "3des"});
 	return forge.asn1.toDer(asn1).getBytes();
 }

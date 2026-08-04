@@ -32,3 +32,30 @@ test("PdfSigner.sign produces a detached PKCS#7 signature over a real PDF", asyn
 	assert.match(dump, /ByteRange/, "embeds a ByteRange");
 	assert.match(dump, /\/Type\s*\/Sig/, "embeds a signature dictionary");
 });
+
+// The combined sign + encrypt path: PdfSigner.sign delegates to PdfCryptor, so
+// the CCN-STIC-221 mode guard must hold here too, not only on direct use.
+test("PdfSigner.sign encrypts the output when an AES-256 EncryptOption is given", async () => {
+	const pdfBytes = await minimalPdf();
+	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD});
+
+	const signed = await signer.sign(pdfBytes, {
+		mode: Zga.Crypto.Mode.AES_256,
+		permissions: ["copy", "print-high"],
+		userpwd: "user-pw",
+	});
+	const dump = Buffer.from(signed).toString("latin1");
+
+	assert.match(dump, /\/Encrypt/, "installs an encryption dictionary");
+	assert.match(dump, /adbe\.pkcs7\.detached/, "still carries the detached signature");
+});
+
+test("PdfSigner.sign refuses a legacy encryption mode", async () => {
+	const pdfBytes = await minimalPdf();
+	const signer = new Zga.PdfSigner({p12cert: makeP12(3072, PWD), pwd: PWD});
+
+	await assert.rejects(
+		() => signer.sign(pdfBytes, {mode: Zga.Crypto.Mode.RC4_128, userpwd: "user-pw"}),
+		/not authorized by CCN-STIC-221/,
+	);
+});

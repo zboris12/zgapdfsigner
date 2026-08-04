@@ -22,12 +22,43 @@ And I use this name to hope the merits from this application will be dedicated t
 * Sign a pdf with a timestamp from [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser :sunflower:)
 * Enable signature's [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note). ( :no_entry_sign:__Not__ available in web browser :sunflower:)
 * Set password protection to a pdf. Supported algorithms:
-  * 40bit RC4 Encryption
-  * 128bit RC4 Encryption
-  * 128bit AES Encryption
-  * 256bit AES Encryption
+  * 256bit AES Encryption (default; the only algorithm allowed out of the box)
+  * 128bit AES Encryption ( :warning: legacy, opt-in)
+  * 128bit RC4 Encryption ( :warning: legacy, opt-in)
+  * 40bit RC4 Encryption ( :warning: legacy, opt-in)
 * Set public-key certificate protection to a pdf.
   Supported algorithms are as same as the password protection.
+
+## Cryptographic constraints (CCN-STIC-221)
+
+This tool enforces the cryptographic requirements of
+[CCN-STIC-221](https://www.ccn-cert.cni.es/) by default. Two rules apply:
+
+__1. Only AES-256 encryption is allowed.__ RC4 is a stream cipher and is not
+authorized, and the RC4 / AES-128 PDF security handlers derive their key with
+MD5. Passing any other mode throws. Set `allowLegacyEncryption` to opt out when
+you need backward compatibility with old readers:
+
+```js
+var eopt = {
+  mode: Zga.Crypto.Mode.RC4_128,
+  allowLegacyEncryption: true, // required, otherwise this throws
+  userpwd: upwd,
+};
+```
+
+__2. Signing keys must be RSA of at least 3000 bits, with log2(e) > 16.__
+A certificate carrying a shorter key (2048 bits, for example) is rejected when
+it is loaded. The standard public exponent 65537 already satisfies the exponent
+rule. Lower the modulus threshold with `minRsaKeyBits` if you must:
+
+```js
+var sopt = {
+  p12cert: cert,
+  pwd: pwd,
+  minRsaKeyBits: 2048, // accepts a 2048bit key; not CCN-STIC-221 compliant
+};
+```
 
 ## About signing with [TSA](https://github.com/zboris12/zgapdfsigner/wiki/API#note) and [LTV](https://github.com/zboris12/zgapdfsigner/wiki/API#note)
 
@@ -373,7 +404,7 @@ Set password protection to the pdf.
 async function protect1(pdf, upwd, opwd){
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.RC4_40,
+    mode: Zga.Crypto.Mode.AES_256,
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     userpwd: upwd,
     ownerpwd: opwd,
@@ -396,7 +427,7 @@ Set public-key certificate protection to the pdf.
 async function protect2(pdf, cert){
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.AES_128,
+    mode: Zga.Crypto.Mode.AES_256,
     pubkeys: [{
       c: cert,
       p: ["copy", "modify", "copy-extract", "annot-forms", "fill-forms", "extract", "assemble"],
@@ -427,7 +458,7 @@ async function signAndProtect1(pdf, cert, pwd, opwd){
   };
   /** @type {EncryptOption} */
   var eopt = {
-    mode: Zga.Crypto.Mode.RC4_128,
+    mode: Zga.Crypto.Mode.AES_256,
     permissions: ["modify", "annot-forms", "fill-forms", "extract", "assemble"],
     ownerpwd: opwd,
   };

@@ -105,8 +105,10 @@ export declare class RsaSigner {
   privateKey: forge.pki.rsa.PrivateKey;
   certificate: forge.pki.Certificate;
   getDigestAlgorithmOid(): string;
+  getSignatureAlgorithmOid(): string;
   sign(data: string): string;
 }
+export declare function createSigner(privateKey: forge.pki.rsa.PrivateKey, certificate: forge.pki.Certificate): RsaSigner;
 export declare class PdfSigner {
   constructor(signopt: SignOption);
   sign(pdf: PDFLib.PDFDocument | Array<number> | Uint8Array | ArrayBuffer | string, cypopt?: EncryptOption): Promise<Uint8Array>;
