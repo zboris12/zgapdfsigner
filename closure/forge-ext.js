@@ -169,6 +169,8 @@ const forge_BigInteger = function(){};
  * @return {number}
  */
 forge_BigInteger.prototype.compareTo = function(a){};
+/** @return {number} */
+forge_BigInteger.prototype.bitLength = function(){};
 /** @constructor */
 const forge_cert = function(){};
 /** @type {forge_key} */
@@ -195,6 +197,11 @@ const forge_key = function(){};
 forge_key.prototype.n;
 /** @type {forge_BigInteger} */
 forge_key.prototype.e;
+/**
+ * @param {forge.md.digest} md
+ * @return {string}
+ */
+forge_key.prototype.sign = function(md){};
 /** @constructor */
 const forge_cert_issuer = function(){};
 /** @type {Array<forge_cert_attr>} */

@@ -35,7 +35,7 @@
     "server": "node test4node.js webserver",
     "test": "node --test",
     "test:fixtures": "node testutil/make-demo.js",
-    "test:manual": "node test4node.js",
+    "test:manual": "node test4node.js ${pfxpwd}",
     "test:fetch": "node test4node.js fetch"
   },
   "dependencies": {
