@@ -24,6 +24,7 @@ export type EncryptOption = {
   userpwd?: string;
   ownerpwd?: string;
   pubkeys?: Array<PubKeyInfo>;
+  strictCrypto?: boolean;
 };
 export type PubKeyInfo = {
   c?: Array<number> | Uint8Array | ArrayBuffer | string | forge.pki.Certificate;
@@ -77,6 +78,8 @@ export type SignOption = {
   signame?: string;
   drawinf?: SignDrawInfo;
   ltv?: number;
+  strictCrypto?: boolean;
+  minRsaKeyBits?: number;
   debug?: boolean;
 };
 export type TsaServiceInfo = {
@@ -98,6 +101,15 @@ export declare class PdfCryptor {
   encryptPdf(pdf: PDFLib.PDFDocument | Array<number> | Uint8Array | ArrayBuffer | string, ref?: PDFLib.PDFRef): Promise<PDFLib.PDFDocument>;
   encryptObject(num: number, val: PDFLib.PDFObject): void;
 }
+export declare class RsaSigner {
+  constructor(privateKey: forge.pki.rsa.PrivateKey, certificate: forge.pki.Certificate);
+  privateKey: forge.pki.rsa.PrivateKey;
+  certificate: forge.pki.Certificate;
+  getDigestAlgorithmOid(): string;
+  getSignatureAlgorithmOid(): string;
+  sign(data: string): string;
+}
+export declare function createSigner(privateKey: forge.pki.rsa.PrivateKey, certificate: forge.pki.Certificate): RsaSigner;
 export declare class PdfSigner {
   constructor(signopt: SignOption);
   sign(pdf: PDFLib.PDFDocument | Array<number> | Uint8Array | ArrayBuffer | string, cypopt?: EncryptOption): Promise<Uint8Array>;
